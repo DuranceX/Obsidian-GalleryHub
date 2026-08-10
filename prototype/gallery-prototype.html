@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<!--
+  PROTOTYPE — 一次性 UI 原型,勿当生产代码
+  问题:GalleryHub 画廊视图应该长什么样?(瀑布流,画廊风格)
+  用法:浏览器直接打开本文件,底部切换条或 ←/→ 键切换变体
+    ?variant=A  极简策展 — 留白、衬线标题、悬停显现
+    ?variant=B  沉浸暗房 — 深色满幅、覆盖层元数据、prompt 徽标
+    ?variant=C  工作台   — 侧边栏筛选、信息密集卡片
+  选定后:把赢家风格翻译进插件 styles.css / view.ts,本文件进 throwaway 分支
+-->
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GalleryHub UI 原型 — 瀑布流画廊</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --ease: cubic-bezier(.22,.61,.36,1);
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { display: block; width: 100%; }
+  .app { min-height: 100vh; }
+
+  /* ==================================================================
+     变体 A — 极简策展:光、留白、衬线、悬停显现
+     ================================================================== */
+  .vA { background: #faf9f7; color: #1a1a1a; }
+  .vA header {
+    max-width: 1280px; margin: 0 auto; padding: 56px 32px 8px;
+    display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap;
+  }
+  .vA h1 {
+    font-family: Georgia, "Songti SC", "SimSun", serif;
+    font-size: 42px; font-weight: 400; letter-spacing: .02em;
+  }
+  .vA .sub { color: #8a8578; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; }
+  .vA nav {
+    max-width: 1280px; margin: 0 auto; padding: 20px 32px 28px;
+    display: flex; gap: 28px; font-size: 13.5px; color: #8a8578;
+  }
+  .vA nav span { cursor: pointer; padding-bottom: 3px; letter-spacing: .04em; }
+  .vA nav span.on { color: #1a1a1a; border-bottom: 1px solid #1a1a1a; }
+  .vA .wall {
+    max-width: 1280px; margin: 0 auto; padding: 0 32px 96px;
+    columns: 3 300px; column-gap: 28px;
+  }
+  .vA figure {
+    break-inside: avoid; margin: 0 0 28px; position: relative;
+    cursor: pointer; overflow: hidden; background: #eceae5;
+  }
+  .vA figure img { transition: transform .6s var(--ease), filter .6s var(--ease); }
+  .vA figure:hover img { transform: scale(1.025); }
+  .vA figcaption {
+    position: absolute; inset: auto 0 0 0; padding: 40px 18px 14px;
+    background: linear-gradient(transparent, rgba(20,18,14,.55));
+    color: #fff; opacity: 0; transition: opacity .35s var(--ease);
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;
+  }
+  .vA figure:hover figcaption { opacity: 1; }
+  .vA figcaption .t { font-family: Georgia, serif; font-size: 16px; }
+  .vA figcaption .r { font-size: 11px; letter-spacing: .1em; opacity: .85; white-space: nowrap; }
+  .vA .videoTag {
+    position: absolute; top: 12px; right: 12px; font-size: 10px; letter-spacing: .14em;
+    background: rgba(250,249,247,.92); color: #1a1a1a; padding: 4px 9px; border-radius: 2px;
+  }
+
+  /* ==================================================================
+     变体 B — 沉浸暗房:深色满幅、密集、覆盖层元数据、prompt 徽标
+     ================================================================== */
+  .vB { background: #0e0f11; color: #e8e6e3; }
+  .vB .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 20px;
+    background: linear-gradient(rgba(14,15,17,.96), rgba(14,15,17,.82) 70%, transparent);
+    backdrop-filter: blur(8px);
+  }
+  .vB .logo { font-weight: 700; font-size: 15px; letter-spacing: .06em; margin-right: 6px; }
+  .vB .logo em { color: #e8b04b; font-style: normal; }
+  .vB .search {
+    flex: 0 1 340px; background: #1b1d21; border: 1px solid #2a2d33; border-radius: 20px;
+    padding: 7px 16px; color: #9a9791; font-size: 13px;
+  }
+  .vB .pills { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  .vB .pill {
+    font-size: 12px; padding: 6px 14px; border-radius: 16px; cursor: pointer;
+    background: #1b1d21; border: 1px solid #2a2d33; color: #9a9791;
+  }
+  .vB .pill.on { background: #e8b04b; border-color: #e8b04b; color: #14120c; font-weight: 600; }
+  .vB .wall { columns: 5 220px; column-gap: 10px; padding: 8px 10px 110px; }
+  .vB .cell {
+    break-inside: avoid; margin: 0 0 10px; position: relative; border-radius: 8px;
+    overflow: hidden; cursor: pointer; background: #1b1d21;
+  }
+  .vB .cell img { transition: transform .45s var(--ease); }
+  .vB .cell:hover img { transform: scale(1.04); }
+  .vB .veil {
+    position: absolute; inset: 0; padding: 12px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    background: linear-gradient(rgba(10,10,12,.5), transparent 32%, transparent 55%, rgba(10,10,12,.78));
+    opacity: 0; transition: opacity .3s var(--ease);
+  }
+  .vB .cell:hover .veil { opacity: 1; }
+  .vB .veil .top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .vB .chipP {
+    font-size: 10px; font-weight: 700; background: #e8b04b; color: #14120c;
+    padding: 3px 8px; border-radius: 4px; letter-spacing: .05em;
+  }
+  .vB .chipV {
+    font-size: 10px; background: rgba(232,230,227,.16); backdrop-filter: blur(4px);
+    padding: 3px 8px; border-radius: 4px; letter-spacing: .1em;
+  }
+  .vB .veil .bottom .t { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .vB .veil .bottom .meta { font-size: 11px; color: #b5b1aa; display: flex; gap: 10px; }
+  .vB .stars { color: #e8b04b; }
+
+  /* ==================================================================
+     变体 C — 工作台:侧边栏筛选 + 信息密集卡片(元数据外显)
+     ================================================================== */
+  .vC { background: #f2f3f5; color: #24292f; display: flex; min-height: 100vh; }
+  .vC aside {
+    width: 232px; flex-shrink: 0; background: #ffffff; border-right: 1px solid #e2e4e8;
+    padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .vC .brand { font-size: 15px; font-weight: 700; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+  .vC .brand .dot { width: 10px; height: 10px; border-radius: 3px; background: #5b67e8; }
+  .vC aside h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: #8b929c; margin: 18px 0 8px;
+  }
+  .vC .fitem {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; padding: 6px 10px; border-radius: 6px; cursor: pointer; color: #454c56;
+  }
+  .vC .fitem:hover { background: #f2f3f5; }
+  .vC .fitem.on { background: #eceefc; color: #4550c7; font-weight: 600; }
+  .vC .fitem .n { font-size: 11px; color: #9aa1ab; }
+  .vC .tagcloud { display: flex; flex-wrap: wrap; gap: 6px; }
+  .vC .tagchip {
+    font-size: 11.5px; background: #f2f3f5; border-radius: 10px; padding: 3px 10px;
+    cursor: pointer; color: #57606a;
+  }
+  .vC .tagchip.on { background: #5b67e8; color: #fff; }
+  .vC main { flex: 1; padding: 0 22px 100px; }
+  .vC .mainbar {
+    position: sticky; top: 0; z-index: 20; background: #f2f3f5;
+    display: flex; gap: 12px; align-items: center; padding: 16px 0 12px;
+  }
+  .vC .search {
+    flex: 0 1 380px; background: #fff; border: 1px solid #dcdfe4; border-radius: 8px;
+    padding: 8px 14px; font-size: 13px; color: #8b929c;
+  }
+  .vC .count { font-size: 12.5px; color: #8b929c; }
+  .vC .btn {
+    margin-left: auto; background: #5b67e8; color: #fff; font-size: 13px; font-weight: 600;
+    border-radius: 8px; padding: 8px 16px; cursor: pointer;
+  }
+  .vC .wall { columns: 4 240px; column-gap: 14px; }
+  .vC .card {
+    break-inside: avoid; margin: 0 0 14px; background: #fff; border-radius: 10px;
+    overflow: hidden; border: 1px solid #e2e4e8; cursor: pointer;
+    transition: box-shadow .25s var(--ease), transform .25s var(--ease);
+  }
+  .vC .card:hover { box-shadow: 0 8px 24px rgba(36,41,47,.12); transform: translateY(-2px); }
+  .vC .thumbwrap { position: relative; background: #eceef1; }
+  .vC .cbody { padding: 10px 12px 12px; }
+  .vC .ct { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vC .cmeta { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-size: 11.5px; color: #8b929c; }
+  .vC .cstars { color: #f0a832; }
+  .vC .cprompt {
+    margin-top: 7px; font-size: 11px; color: #6a7180; background: #f6f7f9;
+    border-left: 3px solid #5b67e8; border-radius: 0 5px 5px 0;
+    padding: 5px 8px; display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden; font-family: Consolas, monospace;
+  }
+  .vC .ctags { display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap; }
+  .vC .ctag { font-size: 10.5px; background: #eceefc; color: #4550c7; border-radius: 8px; padding: 2px 8px; }
+  .vC .vbadge {
+    position: absolute; top: 8px; right: 8px; background: rgba(20,22,26,.72); color: #fff;
+    font-size: 10px; padding: 3px 8px; border-radius: 5px; letter-spacing: .06em;
+  }
+
+  /* ================= 底部浮动切换条(非设计的一部分) ================= */
+  .switcher {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    z-index: 999; display: flex; align-items: center; gap: 4px;
+    background: #17181c; color: #fff; border-radius: 999px;
+    padding: 6px 8px; box-shadow: 0 6px 24px rgba(0,0,0,.35);
+    font-size: 13px; user-select: none; border: 1px solid rgba(255,255,255,.14);
+  }
+  .switcher button {
+    all: unset; cursor: pointer; width: 30px; height: 30px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 15px;
+  }
+  .switcher button:hover { background: rgba(255,255,255,.14); }
+  .switcher .lbl { padding: 0 10px; min-width: 170px; text-align: center; letter-spacing: .02em; }
+  .switcher .lbl b { color: #ffd479; }
+</style>
+</head>
+<body>
+<div id="app" class="app"></div>
+<div class="switcher">
+  <button id="prev" title="上一个 (←)">←</button>
+  <div class="lbl" id="lbl"></div>
+  <button id="next" title="下一个 (→)">→</button>
+</div>
+
+<script>
+/* ------------ 假数据:模拟 gallery.json 的 items ------------ */
+const seeds = [
+  [1015,3,2], [1025,2,3], [1039,4,5], [103,2,2], [1043,3,4], [1056,5,3],
+  [1067,3,2], [106,2,5], [1074,4,3], [1080,2,2], [110,3,4], [111,5,2],
+  [116,2,3], [122,4,2], [129,3,5], [133,2,3], [137,4,2], [142,3,3],
+  [152,2,4], [160,5,2], [164,3,3], [169,2,2], [175,4,4], [177,3,2],
+];
+const TAGS = ["人物", "风景", "赛博朋克", "水墨", "机甲", "摄影/街拍", "摄影/人像", "概念设计"];
+const MODELS = ["flux-dev", "sd-xl", "midjourney-v7", ""];
+const PROMPTS = [
+  "masterpiece, cinematic lighting, a lone samurai standing in neon rain, cyberpunk city, volumetric fog, 8k",
+  "ethereal ink wash painting, mountains in mist, traditional chinese style, minimal, negative space",
+  "portrait of a girl with silver hair, soft rim light, film grain, kodak portra 400, shallow depth of field",
+  "giant mecha in abandoned factory, rust and steam, dramatic god rays, ultra detailed, concept art",
+  "",
+];
+const items = seeds.map(([seed, w, h], i) => ({
+  id: "it" + i,
+  type: i % 7 === 3 ? "video" : "image",
+  src: `https://picsum.photos/seed/${seed}/${w * 200}/${h * 200}`,
+  w: w * 200, h: h * 200,
+  title: ["雨夜武士", "山雾", "银发少女", "废墟机甲", "街角光影", "苍山负雪", "霓虹回廊", "晨雾码头"][i % 8] + " · " + (i + 1),
+  rating: [5,4,0,3,4,5,2,0][i % 8],
+  tags: [TAGS[i % TAGS.length], ...(i % 3 === 0 ? [TAGS[(i + 2) % TAGS.length]] : [])],
+  model: MODELS[i % MODELS.length],
+  prompt: PROMPTS[i % PROMPTS.length],
+}));
+const stars = n => "★".repeat(n);
+
+/* ------------ 变体 A:极简策展 ------------ */
+function renderA(root) {
+  root.className = "app vA";
+  root.innerHTML = `
+    <header>
+      <h1>Gallery<span style="color:#b7a273">Hub</span></h1>
+      <span class="sub">Curated · ${items.length} works</span>
+    </header>
+    <nav>
+      <span class="on">全部</span><span>图片</span><span>视频</span><span>链接</span>
+      <span style="margin-left:auto">◈ 按时间</span>
+    </nav>
+    <div class="wall">
+      ${items.map(it => `
+        <figure>
+          <img src="${it.src}" loading="lazy" alt="">
+          ${it.type === "video" ? '<span class="videoTag">VIDEO</span>' : ""}
+          <figcaption>
+            <span class="t">${it.title}</span>
+            <span class="r">${it.rating ? stars(it.rating) : ""} ${it.model || ""}</span>
+          </figcaption>
+        </figure>`).join("")}
+    </div>`;
+}
+
+/* ------------ 变体 B:沉浸暗房 ------------ */
+function renderB(root) {
+  root.className = "app vB";
+  root.innerHTML = `
+    <div class="topbar">
+      <span class="logo">Gallery<em>Hub</em></span>
+      <div class="search">搜索 prompt、标题、标签…</div>
+      <div class="pills">
+        <span class="pill on">全部</span><span class="pill">图片</span>
+        <span class="pill">视频</span><span class="pill">含 Prompt</span>
+        <span class="pill">★4+</span>
+      </div>
+    </div>
+    <div class="wall">
+      ${items.map(it => `
+        <div class="cell">
+          <img src="${it.src}" loading="lazy" alt="">
+          <div class="veil">
+            <div class="top">
+              ${it.prompt ? '<span class="chipP">PROMPT</span>' : "<span></span>"}
+              ${it.type === "video" ? '<span class="chipV">▶ VIDEO</span>' : ""}
+            </div>
+            <div class="bottom">
+              <div class="t">${it.title}</div>
+              <div class="meta">
+                ${it.rating ? `<span class="stars">${stars(it.rating)}</span>` : ""}
+                ${it.model ? `<span>${it.model}</span>` : ""}
+                <span>${it.tags[0] ?? ""}</span>
+              </div>
+            </div>
+          </div>
+        </div>`).join("")}
+    </div>`;
+}
+
+/* ------------ 变体 C:工作台 ------------ */
+function renderC(root) {
+  root.className = "app vC";
+  const tagCounts = {};
+  items.forEach(it => it.tags.forEach(t => tagCounts[t] = (tagCounts[t] || 0) + 1));
+  root.innerHTML = `
+    <aside>
+      <div class="brand"><span class="dot"></span>GalleryHub</div>
+      <h3>类型</h3>
+      <div class="fitem on"><span>全部资产</span><span class="n">${items.length}</span></div>
+      <div class="fitem"><span>🖼 图片</span><span class="n">${items.filter(i=>i.type==="image").length}</span></div>
+      <div class="fitem"><span>🎬 视频</span><span class="n">${items.filter(i=>i.type==="video").length}</span></div>
+      <div class="fitem"><span>🔗 链接</span><span class="n">0</span></div>
+      <h3>评分</h3>
+      <div class="fitem"><span>★★★★★</span><span class="n">${items.filter(i=>i.rating===5).length}</span></div>
+      <div class="fitem"><span>★★★★ 以上</span><span class="n">${items.filter(i=>i.rating>=4).length}</span></div>
+      <div class="fitem"><span>未评分</span><span class="n">${items.filter(i=>!i.rating).length}</span></div>
+      <h3>标签</h3>
+      <div class="tagcloud">
+        ${Object.entries(tagCounts).map(([t,n],i) =>
+          `<span class="tagchip${i===2?" on":""}">${t} ${n}</span>`).join("")}
+      </div>
+    </aside>
+    <main>
+      <div class="mainbar">
+        <div class="search">🔍 搜索标题 / prompt / 备注…</div>
+        <span class="count">${items.length} 项 · 按导入时间</span>
+        <span class="btn">＋ 导入</span>
+      </div>
+      <div class="wall">
+        ${items.map(it => `
+          <div class="card">
+            <div class="thumbwrap">
+              <img src="${it.src}" loading="lazy" alt="">
+              ${it.type === "video" ? '<span class="vbadge">▶ 0:12</span>' : ""}
+            </div>
+            <div class="cbody">
+              <div class="ct">${it.title}</div>
+              <div class="cmeta">
+                ${it.rating ? `<span class="cstars">${stars(it.rating)}</span>` : "<span>未评分</span>"}
+                ${it.model ? `<span>${it.model}</span>` : ""}
+              </div>
+              ${it.prompt ? `<div class="cprompt">${it.prompt}</div>` : ""}
+              <div class="ctags">${it.tags.map(t=>`<span class="ctag">${t}</span>`).join("")}</div>
+            </div>
+          </div>`).join("")}
+      </div>
+    </main>`;
+}
+
+/* ------------ 切换器 ------------ */
+const VARIANTS = [
+  ["A", "极简策展", renderA],
+  ["B", "沉浸暗房", renderB],
+  ["C", "工作台", renderC],
+];
+function current() {
+  const v = new URLSearchParams(location.search).get("variant") || "A";
+  const idx = VARIANTS.findIndex(x => x[0] === v);
+  return idx < 0 ? 0 : idx;
+}
+function show(idx) {
+  const [key, name, fn] = VARIANTS[idx];
+  const url = new URL(location.href);
+  url.searchParams.set("variant", key);
+  history.replaceState(null, "", url);
+  fn(document.getElementById("app"));
+  document.getElementById("lbl").innerHTML = `<b>${key}</b> — ${name}`;
+  window.scrollTo(0, 0);
+}
+function cycle(d) { show((current() + d + VARIANTS.length) % VARIANTS.length); }
+document.getElementById("prev").addEventListener("click", () => cycle(-1));
+document.getElementById("next").addEventListener("click", () => cycle(1));
+document.addEventListener("keydown", e => {
+  if (["INPUT","TEXTAREA"].includes(document.activeElement?.tagName)) return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  if (e.key === "ArrowRight") cycle(1);
+});
+show(current());
+</script>
+</body>
+</html>
