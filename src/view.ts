@@ -116,7 +116,7 @@ export class GalleryView extends ItemView {
   }
 
   getIcon(): string {
-    return "layout-grid";
+    return "images";
   }
 
   async onOpen(): Promise<void> {
@@ -223,7 +223,7 @@ export class GalleryView extends ItemView {
       cls: "ghub-mode-btn is-active",
       attr: { "aria-label": "画廊模式", title: "画廊" },
     });
-    setIcon(gridBtn, "layout-grid");
+    setIcon(gridBtn, "gallery-thumbnails");
     const canvasBtn = modeWrap.createEl("button", {
       cls: "ghub-mode-btn",
       attr: { "aria-label": "画布模式", title: "画布" },

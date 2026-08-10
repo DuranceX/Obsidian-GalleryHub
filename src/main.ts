@@ -35,7 +35,7 @@ export default class GalleryHubPlugin extends Plugin {
 
     this.addSettingTab(new GalleryHubSettingTab(this.app, this));
 
-    this.addRibbonIcon("layout-grid", "打开 GalleryHub", () => {
+    this.addRibbonIcon("images", "打开 GalleryHub", () => {
       void this.activateView();
     });
 
