@@ -42,12 +42,6 @@ export class Importer {
   /** 导入结束(无论成败)回调,用于收起进度条 */
   onProgressDone: (() => void) | null = null;
 
-  private monthBucket(): string {
-    const d = new Date();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    return `${d.getFullYear()}-${mm}`;
-  }
-
   async importFiles(
     files: FileList | File[],
     folder?: string
@@ -87,8 +81,8 @@ export class Importer {
       return null;
     }
     const id = newId();
-    const bucket = folder ?? this.monthBucket();
-    const dir = normalizePath(`${ASSETS_DIR}/${bucket}`);
+    // 目标目录:调用方传入的文件夹(通常为用户当前选中目录),否则 assets 根
+    const dir = normalizePath(folder ? `${ASSETS_DIR}/${folder}` : ASSETS_DIR);
     const ad = this.app.vault.adapter;
     if (!(await ad.exists(dir))) await ad.mkdir(dir);
     const dest = normalizePath(`${dir}/${id}.${ext.toLowerCase()}`);
