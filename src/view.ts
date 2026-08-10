@@ -12,13 +12,12 @@ import {
 
 export const VIEW_TYPE_GALLERY = "gallery-hub-view";
 
-type RatingFilter = "all" | "unrated" | "below3" | 3 | 4 | 5;
-
 interface FilterState {
   search: string;
   type: ItemType | "all";
   tags: Set<string>;
-  rating: RatingFilter;
+  /** 评分多选:选中的星级集合(0=未评分也可加入);空 = 全部 */
+  ratings: Set<number>;
   /** null = 全部;"" = assets 根直存;其他 = assets 相对路径(含选中文件夹的整棵子树) */
   folder: string | null;
 }
@@ -47,7 +46,7 @@ export class GalleryView extends ItemView {
     search: "",
     type: "all",
     tags: new Set(),
-    rating: "all",
+    ratings: new Set(),
     folder: null,
   };
   private sideEl!: HTMLElement;
@@ -637,22 +636,34 @@ export class GalleryView extends ItemView {
       }
     }
 
-    // 评分
+    // 评分(多选:点亮任意组合,全部=清空)
     if (cfg.showRatings) {
       side.createEl("h3", { text: "评分" });
-      const rateDefs: Array<[RatingFilter, string, number]> = [
-        ["all", "全部评分", all.length],
-        [5, "★★★★★", all.filter((i) => i.rating === 5).length],
-        [4, "★★★★ 以上", all.filter((i) => i.rating >= 4).length],
-        [3, "★★★ 以上", all.filter((i) => i.rating >= 3).length],
-        ["below3", "★★★ 以下", all.filter((i) => i.rating > 0 && i.rating < 3).length],
-        ["unrated", "未评分", all.filter((i) => i.rating === 0).length],
-      ];
-      for (const [val, label, n] of rateDefs) {
-        this.fitem(side, null, label, n, this.filter.rating === val, () => {
-          this.filter.rating = val;
+      this.fitem(
+        side,
+        null,
+        "全部评分",
+        all.length,
+        this.filter.ratings.size === 0,
+        () => {
+          this.filter.ratings.clear();
           this.render();
-        });
+        }
+      );
+      for (let star = 5; star >= 1; star--) {
+        const n = all.filter((i) => i.rating === star).length;
+        this.fitem(
+          side,
+          null,
+          "★".repeat(star),
+          n,
+          this.filter.ratings.has(star),
+          () => {
+            if (this.filter.ratings.has(star)) this.filter.ratings.delete(star);
+            else this.filter.ratings.add(star);
+            this.render();
+          }
+        );
       }
     }
 
@@ -706,8 +717,8 @@ export class GalleryView extends ItemView {
       this.filter.type = "all";
       gridDirty = true;
     }
-    if (!cfg.showRatings && this.filter.rating !== "all") {
-      this.filter.rating = "all";
+    if (!cfg.showRatings && this.filter.ratings.size) {
+      this.filter.ratings.clear();
       gridDirty = true;
     }
     if (!cfg.showTags && this.filter.tags.size) {
@@ -1015,17 +1026,7 @@ export class GalleryView extends ItemView {
           return false;
       }
       if (f.type !== "all" && it.type !== f.type) return false;
-      if (f.rating === "unrated") {
-        if (it.rating !== 0) return false;
-      } else if (f.rating === "below3") {
-        if (!(it.rating > 0 && it.rating < 3)) return false;
-      } else if (f.rating === 5) {
-        if (it.rating !== 5) return false;
-      } else if (f.rating === 4) {
-        if (it.rating < 4) return false;
-      } else if (f.rating === 3) {
-        if (it.rating < 3) return false;
-      }
+      if (f.ratings.size && !f.ratings.has(it.rating)) return false;
       if (f.tags.size && ![...f.tags].every((t) => it.tags.includes(t)))
         return false;
       if (f.search) {
@@ -1083,7 +1084,7 @@ export class GalleryView extends ItemView {
             search: "",
             type: "all",
             tags: new Set(),
-            rating: "all",
+            ratings: new Set(),
             folder: null,
           };
           this.render();

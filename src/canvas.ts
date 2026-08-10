@@ -482,23 +482,20 @@ export class CanvasBoard {
       menu.addItem((mi) =>
         mi.setTitle("编辑文字").setIcon("pencil").onClick(() => startEdit())
       );
-      // 颜色子项
-      for (const [color, label] of ELEMENT_COLORS) {
-        menu.addItem((mi) => {
-          mi.setTitle(`颜色:${label}`)
-            .setIcon(el.color === color || (!el.color && !color) ? "check" : "palette")
-            .onClick(() => {
-              el.color = color || undefined;
-              this.store.updateBoardElement(
-                this.boardId,
-                el.id,
-                { color: el.color },
-                true
-              );
-              this.applyElementColor(node, el);
-            });
-        });
-      }
+      menu.addItem((mi) =>
+        mi.setTitle("颜色…").setIcon("palette").onClick(() => {
+          this.showColorPicker(e.clientX, e.clientY, el.color, (color) => {
+            el.color = color || undefined;
+            this.store.updateBoardElement(
+              this.boardId,
+              el.id,
+              { color: el.color },
+              true
+            );
+            this.applyElementColor(node, el);
+          });
+        })
+      );
       menu.addSeparator();
       menu.addItem((mi) =>
         mi.setTitle("删除").setIcon("trash-2").onClick(() => {
@@ -507,6 +504,46 @@ export class CanvasBoard {
       );
       menu.showAtMouseEvent(e);
     });
+  }
+
+  /** 色点弹出面板:直观色块,点击即选 */
+  private showColorPicker(
+    x: number,
+    y: number,
+    current: string | undefined,
+    onPick: (color: string) => void
+  ): void {
+    const pop = document.body.createDiv({ cls: "ghub-colorpop" });
+    pop.style.left = `${Math.min(x, window.innerWidth - 240)}px`;
+    pop.style.top = `${Math.min(y, window.innerHeight - 60)}px`;
+    for (const [color, label] of ELEMENT_COLORS) {
+      const dot = pop.createDiv({
+        cls: "ghub-colordot" + ((current ?? "") === color ? " is-current" : ""),
+        attr: { "aria-label": label, title: label },
+      });
+      if (color) dot.style.setProperty("--dot", color);
+      else dot.addClass("is-default");
+      dot.addEventListener("click", () => {
+        onPick(color);
+        close();
+      });
+    }
+    const close = () => {
+      pop.remove();
+      document.removeEventListener("pointerdown", onOutside, true);
+      window.removeEventListener("keydown", onKey, true);
+    };
+    const onOutside = (ev: PointerEvent) => {
+      if (!pop.contains(ev.target as Node)) close();
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") close();
+    };
+    // 延迟注册,避免当前这次右键的收尾事件立刻触发关闭
+    window.setTimeout(() => {
+      document.addEventListener("pointerdown", onOutside, true);
+      window.addEventListener("keydown", onKey, true);
+    }, 0);
   }
 
   private renderCard(it: GalleryItem): void {
