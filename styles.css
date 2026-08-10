@@ -1,11 +1,12 @@
-/* ===== GalleryHub ===== */
+/* ===== GalleryHub — 暗色工作台 · 瀑布流 =====
+   设计:C(工作台侧边栏/信息外显) + B(暗房质感)合并
+   全部取色走 Obsidian 主题变量,暗色主题下呈现暗房效果,亮色主题自动降级适配 */
 
 .ghub-root {
   display: flex;
-  flex-direction: column;
   height: 100%;
   padding: 0;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .ghub-root.ghub-dragging {
@@ -13,49 +14,82 @@
   outline-offset: -6px;
 }
 
-/* ---- 工具栏 ---- */
-.ghub-toolbar {
+/* ================= 侧边栏 ================= */
+.ghub-side {
+  width: 216px;
+  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding: 16px 12px 24px;
+  background: var(--background-secondary);
+  border-right: 1px solid var(--background-modifier-border);
+}
+
+.ghub-side h3 {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-faint);
+  margin: 18px 6px 6px;
+  font-weight: 600;
+}
+
+.ghub-side h3:first-child {
+  margin-top: 2px;
+}
+
+.ghub-fitem {
   display: flex;
-  gap: 8px;
+  justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--background-primary);
-  border-bottom: 1px solid var(--background-modifier-border);
-  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  user-select: none;
 }
 
-.ghub-search {
-  flex: 1 1 200px;
-  min-width: 160px;
+.ghub-fitem:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 
-.ghub-spacer {
-  flex: 1;
+.ghub-fitem.is-active {
+  background: var(--background-modifier-active-hover, var(--background-modifier-hover));
+  color: var(--text-normal);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--interactive-accent);
 }
 
-/* ---- 标签栏 ---- */
-.ghub-tagbar {
+.ghub-fitem .ghub-n {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.ghub-tagcloud {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 2px 6px;
 }
 
 .ghub-tag {
-  font-size: var(--font-ui-smaller);
-  padding: 2px 10px;
-  border-radius: 12px;
-  background: var(--background-secondary);
+  font-size: 11.5px;
+  padding: 3px 10px;
+  border-radius: 11px;
+  background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
   cursor: pointer;
   user-select: none;
 }
 
 .ghub-tag:hover {
-  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover);
 }
 
 .ghub-tag.is-active {
@@ -64,74 +98,120 @@
   border-color: var(--interactive-accent);
 }
 
-.ghub-tag-clear {
-  border-style: dashed;
+.ghub-side-empty {
+  font-size: 12px;
+  color: var(--text-faint);
+  padding: 2px 8px;
+}
+
+/* ================= 主区 ================= */
+.ghub-main {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+  padding: 0 16px 32px;
+}
+
+.ghub-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 12px 0 10px;
+  background: var(--background-primary);
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 12px;
+}
+
+.ghub-search {
+  flex: 0 1 340px;
+  min-width: 180px;
 }
 
 .ghub-count {
-  padding: 2px 14px;
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
 }
 
-/* ---- 网格 ---- */
+.ghub-spacer {
+  flex: 1;
+}
+
+/* ================= 瀑布流 ================= */
 .ghub-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-  padding: 4px 12px 24px;
+  columns: 5 210px;
+  column-gap: 12px;
 }
 
 .ghub-empty {
-  grid-column: 1 / -1;
   text-align: center;
-  padding: 48px 12px;
-  color: var(--text-muted);
+  padding: 64px 12px;
+  color: var(--text-faint);
 }
 
-/* ---- 卡片 ---- */
+/* ================= 卡片 ================= */
 .ghub-card {
-  border-radius: 8px;
+  break-inside: avoid;
+  margin: 0 0 12px;
+  border-radius: 10px;
   overflow: hidden;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .ghub-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-s);
+  border-color: var(--background-modifier-border-hover);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.ghub-card:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
 }
 
 .ghub-thumb {
   position: relative;
-  aspect-ratio: 1 / 1;
   background: var(--background-primary-alt);
+  overflow: hidden;
 }
 
 .ghub-thumb img,
 .ghub-thumb video {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
   display: block;
+  min-height: 60px;
+  transition: transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.ghub-card:hover .ghub-thumb img,
+.ghub-card:hover .ghub-thumb video {
+  transform: scale(1.03);
 }
 
 .ghub-badge {
   position: absolute;
-  right: 6px;
-  top: 6px;
-  background: rgba(0, 0, 0, 0.55);
+  right: 8px;
+  top: 8px;
+  background: rgba(12, 12, 14, 0.72);
   color: #fff;
   font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 5px;
   pointer-events: none;
+  backdrop-filter: blur(3px);
 }
 
 .ghub-linkbox {
-  height: 100%;
+  aspect-ratio: 4 / 3;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -140,24 +220,28 @@
 }
 
 .ghub-linkbox-icon {
-  font-size: 32px;
+  font-size: 30px;
+  opacity: 0.85;
 }
 
 .ghub-linkbox-domain {
-  font-size: var(--font-ui-smaller);
+  font-size: 11.5px;
   color: var(--text-muted);
-  max-width: 90%;
+  max-width: 88%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.ghub-card-meta {
-  padding: 6px 8px 8px;
+/* ---- 卡片信息区(工作台式外显)---- */
+.ghub-card-body {
+  padding: 9px 11px 11px;
 }
 
 .ghub-card-title {
-  font-size: var(--font-ui-small);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -165,34 +249,78 @@
 
 .ghub-card-sub {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
-  margin-top: 2px;
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-faint);
+  overflow: hidden;
 }
 
 .ghub-stars {
   color: var(--color-yellow);
   letter-spacing: -1px;
+  flex-shrink: 0;
 }
 
-.ghub-flag {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border-radius: 3px;
-  padding: 0 4px;
-  font-size: 9px;
-  font-weight: bold;
-}
-
-.ghub-card-tags {
+.ghub-card-model {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ---- 详情弹窗 ---- */
+.ghub-prompt-snippet {
+  margin-top: 7px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--background-primary);
+  border-left: 2px solid var(--interactive-accent);
+  border-radius: 0 5px 5px 0;
+  padding: 5px 8px;
+  font-family: var(--font-monospace);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+
+.ghub-card-tags {
+  display: flex;
+  gap: 5px;
+  margin-top: 7px;
+  flex-wrap: wrap;
+}
+
+.ghub-ctag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  color: var(--text-accent);
+}
+
+/* ================= 窄窗自适应 ================= */
+@media (max-width: 640px) {
+  .ghub-root {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .ghub-side {
+    width: 100%;
+    height: auto;
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+  .ghub-main {
+    height: auto;
+    overflow: visible;
+  }
+}
+
+/* ================= 详情弹窗 ================= */
 .ghub-detail {
   max-height: 80vh;
   overflow-y: auto;
@@ -207,7 +335,7 @@
 .ghub-detail-preview video {
   max-width: 100%;
   max-height: 320px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .ghub-detail-link {

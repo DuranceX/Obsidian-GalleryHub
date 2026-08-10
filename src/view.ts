@@ -6,11 +6,13 @@ import { DetailModal, AddLinkModal } from "./detail";
 
 export const VIEW_TYPE_GALLERY = "gallery-hub-view";
 
+type RatingFilter = "all" | "unrated" | 4 | 5;
+
 interface FilterState {
   search: string;
   type: ItemType | "all";
   tags: Set<string>;
-  minRating: number;
+  rating: RatingFilter;
 }
 
 export class GalleryView extends ItemView {
@@ -21,10 +23,10 @@ export class GalleryView extends ItemView {
     search: "",
     type: "all",
     tags: new Set(),
-    minRating: 0,
+    rating: "all",
   };
+  private sideEl!: HTMLElement;
   private gridEl!: HTMLElement;
-  private tagBarEl!: HTMLElement;
   private countEl!: HTMLElement;
   private observer: IntersectionObserver | null = null;
 
@@ -70,13 +72,14 @@ export class GalleryView extends ItemView {
           }
         }
       },
-      { root, rootMargin: "300px" }
+      { root, rootMargin: "400px" }
     );
 
-    this.buildToolbar(root);
-    this.tagBarEl = root.createDiv({ cls: "ghub-tagbar" });
-    this.countEl = root.createDiv({ cls: "ghub-count" });
-    this.gridEl = root.createDiv({ cls: "ghub-grid" });
+    // 骨架:侧边栏 + 主区
+    this.sideEl = root.createDiv({ cls: "ghub-side" });
+    const main = root.createDiv({ cls: "ghub-main" });
+    this.buildToolbar(main);
+    this.gridEl = main.createDiv({ cls: "ghub-grid" });
 
     // 拖拽导入(系统文件)
     root.addEventListener("dragover", (e) => {
@@ -101,12 +104,11 @@ export class GalleryView extends ItemView {
     this.observer?.disconnect();
   }
 
-  // ---------- 工具栏 ----------
+  // ---------- 顶栏 ----------
 
-  private buildToolbar(root: HTMLElement): void {
-    const bar = root.createDiv({ cls: "ghub-toolbar" });
+  private buildToolbar(main: HTMLElement): void {
+    const bar = main.createDiv({ cls: "ghub-toolbar" });
 
-    // 搜索
     const search = bar.createEl("input", {
       cls: "ghub-search",
       attr: { type: "search", placeholder: "搜索标题 / prompt / 备注…" },
@@ -116,37 +118,10 @@ export class GalleryView extends ItemView {
       this.renderGrid();
     });
 
-    // 类型
-    const typeSel = bar.createEl("select", { cls: "dropdown" });
-    for (const [v, label] of [
-      ["all", "全部类型"],
-      ["image", "图片"],
-      ["video", "视频"],
-      ["link", "链接"],
-    ]) {
-      typeSel.createEl("option", { text: label, attr: { value: v } });
-    }
-    typeSel.addEventListener("change", () => {
-      this.filter.type = typeSel.value as FilterState["type"];
-      this.renderGrid();
-    });
-
-    // 评分
-    const rateSel = bar.createEl("select", { cls: "dropdown" });
-    for (let i = 0; i <= 5; i++) {
-      rateSel.createEl("option", {
-        text: i === 0 ? "全部评分" : "≥ " + "★".repeat(i),
-        attr: { value: String(i) },
-      });
-    }
-    rateSel.addEventListener("change", () => {
-      this.filter.minRating = Number(rateSel.value);
-      this.renderGrid();
-    });
+    this.countEl = bar.createDiv({ cls: "ghub-count" });
 
     bar.createDiv({ cls: "ghub-spacer" });
 
-    // 导入按钮
     const importBtn = bar.createEl("button", { text: "＋ 导入文件" });
     importBtn.addEventListener("click", () => {
       const input = createEl("input", {
@@ -166,20 +141,59 @@ export class GalleryView extends ItemView {
     });
   }
 
-  // ---------- 渲染 ----------
+  // ---------- 侧边栏 ----------
 
-  private render(): void {
-    this.renderTagBar();
-    this.renderGrid();
-  }
+  private renderSidebar(): void {
+    const side = this.sideEl;
+    side.empty();
+    const all = this.store.getItems();
 
-  private renderTagBar(): void {
-    this.tagBarEl.empty();
-    const tags = this.store.allTags();
-    if (!tags.length) return;
-    for (const tag of tags) {
-      const chip = this.tagBarEl.createEl("span", {
-        text: tag,
+    // 类型
+    side.createEl("h3", { text: "类型" });
+    const typeDefs: Array<[ItemType | "all", string, number]> = [
+      ["all", "全部资产", all.length],
+      ["image", "🖼 图片", all.filter((i) => i.type === "image").length],
+      ["video", "🎬 视频", all.filter((i) => i.type === "video").length],
+      ["link", "🔗 链接", all.filter((i) => i.type === "link").length],
+    ];
+    for (const [val, label, n] of typeDefs) {
+      this.fitem(side, label, n, this.filter.type === val, () => {
+        this.filter.type = val;
+        this.render();
+      });
+    }
+
+    // 评分
+    side.createEl("h3", { text: "评分" });
+    const rateDefs: Array<[RatingFilter, string, number]> = [
+      ["all", "全部评分", all.length],
+      [5, "★★★★★", all.filter((i) => i.rating === 5).length],
+      [4, "★★★★ 以上", all.filter((i) => i.rating >= 4).length],
+      ["unrated", "未评分", all.filter((i) => i.rating === 0).length],
+    ];
+    for (const [val, label, n] of rateDefs) {
+      this.fitem(side, label, n, this.filter.rating === val, () => {
+        this.filter.rating = val;
+        this.render();
+      });
+    }
+
+    // 标签云
+    side.createEl("h3", { text: "标签" });
+    const counts = new Map<string, number>();
+    for (const it of all)
+      for (const t of it.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+    if (!counts.size) {
+      side.createDiv({ cls: "ghub-side-empty", text: "暂无标签" });
+      return;
+    }
+    const cloud = side.createDiv({ cls: "ghub-tagcloud" });
+    const sorted = [...counts.entries()].sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh")
+    );
+    for (const [tag, n] of sorted) {
+      const chip = cloud.createEl("span", {
+        text: `${tag} ${n}`,
         cls: "ghub-tag" + (this.filter.tags.has(tag) ? " is-active" : ""),
       });
       chip.addEventListener("click", () => {
@@ -189,9 +203,9 @@ export class GalleryView extends ItemView {
       });
     }
     if (this.filter.tags.size) {
-      const clear = this.tagBarEl.createEl("span", {
+      const clear = cloud.createEl("span", {
         text: "✕ 清除",
-        cls: "ghub-tag ghub-tag-clear",
+        cls: "ghub-tag",
       });
       clear.addEventListener("click", () => {
         this.filter.tags.clear();
@@ -200,11 +214,39 @@ export class GalleryView extends ItemView {
     }
   }
 
+  private fitem(
+    parent: HTMLElement,
+    label: string,
+    count: number,
+    active: boolean,
+    onClick: () => void
+  ): void {
+    const el = parent.createDiv({
+      cls: "ghub-fitem" + (active ? " is-active" : ""),
+    });
+    el.createSpan({ text: label });
+    el.createSpan({ cls: "ghub-n", text: String(count) });
+    el.addEventListener("click", onClick);
+  }
+
+  // ---------- 渲染 ----------
+
+  private render(): void {
+    this.renderSidebar();
+    this.renderGrid();
+  }
+
   private filtered(): GalleryItem[] {
     const f = this.filter;
     return this.store.getItems().filter((it) => {
       if (f.type !== "all" && it.type !== f.type) return false;
-      if (it.rating < f.minRating) return false;
+      if (f.rating === "unrated") {
+        if (it.rating !== 0) return false;
+      } else if (f.rating === 5) {
+        if (it.rating !== 5) return false;
+      } else if (f.rating === 4) {
+        if (it.rating < 4) return false;
+      }
       if (f.tags.size && ![...f.tags].every((t) => it.tags.includes(t)))
         return false;
       if (f.search) {
@@ -241,7 +283,7 @@ export class GalleryView extends ItemView {
   }
 
   private card(it: GalleryItem): HTMLElement {
-    const card = createDiv({ cls: "ghub-card" });
+    const card = createDiv({ cls: "ghub-card", attr: { tabindex: "0" } });
 
     const thumb = card.createDiv({ cls: "ghub-thumb" });
     if (it.type === "image" && it.path) {
@@ -254,8 +296,11 @@ export class GalleryView extends ItemView {
       });
       video.dataset.src = this.app.vault.adapter.getResourcePath(it.path);
       this.observer?.observe(video);
-      thumb.createDiv({ cls: "ghub-badge", text: "▶" });
-      card.addEventListener("mouseenter", () => void video.play().catch(() => {}));
+      thumb.createDiv({ cls: "ghub-badge", text: "▶ VIDEO" });
+      card.addEventListener(
+        "mouseenter",
+        () => void video.play().catch(() => {})
+      );
       card.addEventListener("mouseleave", () => video.pause());
     } else if (it.type === "link") {
       const box = thumb.createDiv({ cls: "ghub-linkbox" });
@@ -270,21 +315,41 @@ export class GalleryView extends ItemView {
       }
     }
 
-    const meta = card.createDiv({ cls: "ghub-card-meta" });
-    meta.createDiv({ cls: "ghub-card-title", text: it.title || "(无标题)" });
-    const sub = meta.createDiv({ cls: "ghub-card-sub" });
+    // 信息区(工作台式外显)
+    const body = card.createDiv({ cls: "ghub-card-body" });
+    body.createDiv({ cls: "ghub-card-title", text: it.title || "(无标题)" });
+
+    const sub = body.createDiv({ cls: "ghub-card-sub" });
     if (it.rating > 0)
       sub.createSpan({ text: "★".repeat(it.rating), cls: "ghub-stars" });
-    if (it.gen.prompt) sub.createSpan({ text: "P", cls: "ghub-flag", attr: { title: "含 prompt" } });
-    if (it.tags.length)
-      sub.createSpan({ text: it.tags.slice(0, 3).join(" · "), cls: "ghub-card-tags" });
+    if (it.gen.model)
+      sub.createSpan({ text: it.gen.model, cls: "ghub-card-model" });
 
-    card.addEventListener("click", (e) => {
-      if (it.type === "link" && (e.ctrlKey || e.metaKey) && it.url) {
+    if (it.gen.prompt) {
+      body.createDiv({ cls: "ghub-prompt-snippet", text: it.gen.prompt });
+    }
+
+    if (it.tags.length) {
+      const tags = body.createDiv({ cls: "ghub-card-tags" });
+      for (const t of it.tags.slice(0, 4))
+        tags.createSpan({ cls: "ghub-ctag", text: t });
+    }
+
+    const open = (e: MouseEvent | KeyboardEvent) => {
+      if (
+        it.type === "link" &&
+        "ctrlKey" in e &&
+        (e.ctrlKey || e.metaKey) &&
+        it.url
+      ) {
         window.open(it.url);
         return;
       }
       new DetailModal(this.app, this.store, it).open();
+    };
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") open(e);
     });
 
     return card;
