@@ -23,12 +23,23 @@ export class DetailModal extends Modal {
     // ================= 左:舞台 =================
     const stage = contentEl.createDiv({ cls: "ghub-stage" });
     if (it.type === "image" && it.path) {
-      stage.createEl("img", {
+      const img = stage.createEl("img", {
         attr: {
           src: this.app.vault.adapter.getResourcePath(it.path),
           alt: it.title || it.fileName || "图片资产",
         },
       });
+      // 点击在「适应窗口 ↔ 原始大小」间切换
+      img.addEventListener("click", () => {
+        const zoomed = stage.hasClass("is-zoomed");
+        stage.toggleClass("is-zoomed", !zoomed);
+      });
+      if (it.w && it.h) {
+        stage.createDiv({
+          cls: "ghub-stage-meta",
+          text: `${it.w} × ${it.h}`,
+        });
+      }
     } else if (it.type === "video" && it.path) {
       stage.createEl("video", {
         attr: {
@@ -48,7 +59,45 @@ export class DetailModal extends Modal {
     // ================= 右:信息栏 =================
     const bar = contentEl.createDiv({ cls: "ghub-panelbar" });
 
-    // 标题(内联编辑)
+    // ---- 头部:类型徽标 + 操作图标 ----
+    const head = bar.createDiv({ cls: "ghub-d-head" });
+    const typeBadge = head.createSpan({ cls: "ghub-d-type" });
+    const typeIcon =
+      it.type === "image" ? "image" : it.type === "video" ? "film" : "link";
+    const ticon = typeBadge.createSpan();
+    setIcon(ticon, typeIcon);
+    typeBadge.createSpan({
+      text: it.type === "image" ? "图片" : it.type === "video" ? "视频" : "链接",
+    });
+    const headActions = head.createDiv({ cls: "ghub-d-actions" });
+    if (it.path) {
+      this.iconBtn(headActions, "file-symlink", "在 Obsidian 中打开原文件", () => {
+        const f = this.app.vault.getAbstractFileByPath(it.path!);
+        if (f instanceof TFile) {
+          void this.app.workspace.getLeaf(true).openFile(f);
+          this.close();
+        }
+      });
+    }
+    if (it.type === "link" && it.url) {
+      this.iconBtn(headActions, "external-link", "在浏览器打开", () =>
+        window.open(it.url)
+      );
+    }
+    const delBtn = this.iconBtn(
+      headActions,
+      "trash-2",
+      "从库中移除(不删原文件)",
+      () => {
+        this.store.deleteItem(it.id);
+        new Notice("已从库中移除(原文件未删除)");
+        this.close();
+        this.onDeleted?.();
+      }
+    );
+    delBtn.addClass("ghub-danger");
+
+    // ---- 标题(内联编辑)----
     const titleInput = bar.createEl("input", {
       cls: "ghub-title-input",
       attr: { type: "text", placeholder: "无标题", "aria-label": "标题" },
@@ -58,51 +107,97 @@ export class DetailModal extends Modal {
       this.patch({ title: titleInput.value })
     );
 
-    // 文件信息
+    // ---- 文件信息 ----
     const fmeta: string[] = [];
     if (it.fileName) fmeta.push(it.fileName);
-    if (it.w && it.h) fmeta.push(`${it.w}×${it.h}`);
     fmeta.push(new Date(it.createdAt).toLocaleDateString());
-    bar.createDiv({ cls: "ghub-fmeta", text: fmeta.join(" · ") });
+    bar.createDiv({ cls: "ghub-fmeta", text: fmeta.join("  ·  ") });
 
-    // 星级点选
+    // ---- 星级点选(悬停预览填充)----
     const starRow = bar.createDiv({
       cls: "ghub-starpick",
       attr: { role: "radiogroup", "aria-label": "评分" },
     });
-    const renderStars = () => {
+    const renderStars = (preview?: number) => {
       starRow.empty();
+      const shown = preview ?? this.item.rating;
       for (let i = 1; i <= 5; i++) {
         const s = starRow.createSpan({
           text: "★",
-          cls: this.item.rating >= i ? "on" : "",
+          cls: shown >= i ? "on" : "",
           attr: { role: "radio", "aria-label": `${i} 星` },
         });
         s.addEventListener("click", () => {
           this.patch({ rating: this.item.rating === i ? 0 : i });
           renderStars();
         });
+        s.addEventListener("mouseenter", () => renderStars(i));
       }
+      starRow.addEventListener("mouseleave", () => renderStars(), {
+        once: true,
+      });
     };
     renderStars();
 
-    // 标签
-    this.field(bar, "标签", (wrap) => {
-      const input = wrap.createEl("input", {
-        attr: { type: "text", placeholder: "逗号分隔,支持 父/子" },
+    // ---- 标签 chips 编辑器 ----
+    const tagField = bar.createDiv({ cls: "ghub-field" });
+    tagField.createDiv({ cls: "ghub-field-label" }).createSpan({ text: "标签" });
+    const chipsWrap = tagField.createDiv({ cls: "ghub-chips" });
+    const renderChips = () => {
+      chipsWrap.empty();
+      for (const t of this.item.tags) {
+        const chip = chipsWrap.createSpan({ cls: "ghub-chip" });
+        chip.createSpan({ text: t });
+        const x = chip.createSpan({ cls: "ghub-chip-x" });
+        setIcon(x, "x");
+        x.addEventListener("click", () => {
+          this.patch({ tags: this.item.tags.filter((v) => v !== t) });
+          renderChips();
+        });
+      }
+      const input = chipsWrap.createEl("input", {
+        cls: "ghub-chip-input",
+        attr: { type: "text", placeholder: this.item.tags.length ? "" : "添加标签…" },
       });
-      input.value = it.tags.join(", ");
-      input.addEventListener("input", () =>
-        this.patch({
-          tags: input.value
-            .split(/[,，]/)
-            .map((s) => s.trim())
-            .filter(Boolean),
-        })
-      );
-    });
+      const commit = () => {
+        const vals = input.value
+          .split(/[,，]/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .filter((v) => !this.item.tags.includes(v));
+        if (vals.length) {
+          this.patch({ tags: [...this.item.tags, ...vals] });
+          renderChips();
+          // 重新聚焦到新 input
+          const ni = chipsWrap.querySelector<HTMLInputElement>(".ghub-chip-input");
+          ni?.focus();
+        } else {
+          input.value = "";
+        }
+      };
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === ",") {
+          e.preventDefault();
+          commit();
+        }
+        if (
+          e.key === "Backspace" &&
+          !input.value &&
+          this.item.tags.length
+        ) {
+          this.patch({ tags: this.item.tags.slice(0, -1) });
+          renderChips();
+          const ni = chipsWrap.querySelector<HTMLInputElement>(".ghub-chip-input");
+          ni?.focus();
+        }
+      });
+      input.addEventListener("blur", () => {
+        if (input.value.trim()) commit();
+      });
+    };
+    renderChips();
 
-    // 来源
+    // ---- 来源 ----
     this.field(bar, "来源链接", (wrap) => {
       const input = wrap.createEl("input", {
         attr: { type: "text", placeholder: "https://…" },
@@ -111,16 +206,20 @@ export class DetailModal extends Modal {
       input.addEventListener("input", () => this.patch({ source: input.value }));
     });
 
-    bar.createEl("hr", { cls: "ghub-hr" });
+    // ---- 生成参数分区卡片 ----
+    const genSec = bar.createDiv({ cls: "ghub-sec" });
+    const genHead = genSec.createDiv({ cls: "ghub-sec-head" });
+    const gicon = genHead.createSpan({ cls: "ghub-sec-icon" });
+    setIcon(gicon, "sparkles");
+    genHead.createSpan({ text: "AI 生成参数" });
 
-    // ---- AI 生成参数 ----
-    this.field(bar, "Prompt", (wrap) => {
+    this.field(genSec, "Prompt", (wrap) => {
       const ta = wrap.createEl("textarea", { attr: { rows: "4" } });
       ta.value = it.gen.prompt;
       ta.addEventListener("input", () => this.patchGen({ prompt: ta.value }));
     }, () => this.item.gen.prompt);
 
-    this.field(bar, "Negative", (wrap) => {
+    this.field(genSec, "Negative", (wrap) => {
       const ta = wrap.createEl("textarea", { attr: { rows: "2" } });
       ta.value = it.gen.negativePrompt;
       ta.addEventListener("input", () =>
@@ -128,52 +227,42 @@ export class DetailModal extends Modal {
       );
     }, () => this.item.gen.negativePrompt);
 
-    this.field(bar, "模型", (wrap) => {
+    // 模型 / Seed 双列
+    const grid2 = genSec.createDiv({ cls: "ghub-grid2" });
+    this.field(grid2, "模型", (wrap) => {
       const input = wrap.createEl("input", {
-        attr: { type: "text", placeholder: "flux / sd-xl / mj…" },
+        attr: { type: "text", placeholder: "flux / sd-xl…" },
       });
       input.value = it.gen.model;
       input.addEventListener("input", () => this.patchGen({ model: input.value }));
     });
-
-    this.field(bar, "Seed", (wrap) => {
+    this.field(grid2, "Seed", (wrap) => {
       const input = wrap.createEl("input", { attr: { type: "text" } });
       input.value = it.gen.seed;
       input.addEventListener("input", () => this.patchGen({ seed: input.value }));
     });
 
-    bar.createEl("hr", { cls: "ghub-hr" });
-
-    // 备注
+    // ---- 备注 ----
     this.field(bar, "备注", (wrap) => {
       const ta = wrap.createEl("textarea", { attr: { rows: "3" } });
       ta.value = it.note;
       ta.addEventListener("input", () => this.patch({ note: ta.value }));
     });
+  }
 
-    // ---- 操作 ----
-    const actions = bar.createDiv({ cls: "ghub-actions" });
-    if (it.path) {
-      this.action(actions, "file-symlink", "在 Obsidian 中打开原文件", () => {
-        const f = this.app.vault.getAbstractFileByPath(it.path!);
-        if (f instanceof TFile) {
-          void this.app.workspace.getLeaf(true).openFile(f);
-          this.close();
-        }
-      });
-    }
-    if (it.type === "link" && it.url) {
-      this.action(actions, "external-link", "在浏览器打开", () =>
-        window.open(it.url)
-      );
-    }
-    const del = this.action(actions, "trash-2", "从库中移除(不删原文件)", () => {
-      this.store.deleteItem(it.id);
-      new Notice("已从库中移除(原文件未删除)");
-      this.close();
-      this.onDeleted?.();
+  private iconBtn(
+    parent: HTMLElement,
+    icon: string,
+    label: string,
+    onClick: () => void
+  ): HTMLElement {
+    const btn = parent.createEl("button", {
+      cls: "ghub-icon-btn",
+      attr: { "aria-label": label, title: label },
     });
-    del.addClass("ghub-danger");
+    setIcon(btn, icon);
+    btn.addEventListener("click", onClick);
+    return btn;
   }
 
   /** 带小标题的字段;getCopyText 提供时在标题右侧生成复制按钮 */
@@ -205,20 +294,6 @@ export class DetailModal extends Modal {
       });
     }
     build(f);
-  }
-
-  private action(
-    parent: HTMLElement,
-    icon: string,
-    label: string,
-    onClick: () => void
-  ): HTMLElement {
-    const btn = parent.createEl("button");
-    const ic = btn.createSpan();
-    setIcon(ic, icon);
-    btn.createSpan({ text: label });
-    btn.addEventListener("click", onClick);
-    return btn;
   }
 
   private patch(p: Partial<GalleryItem>): void {
