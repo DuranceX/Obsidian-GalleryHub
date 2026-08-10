@@ -252,6 +252,7 @@ const en = {
   // 导入 / 文件操作
   importFailed: "Failed to import {name}: {msg}",
   importedN: "Imported {n} assets",
+  importProgress: "Importing {current}/{total} — {name}",
   unsupportedFormat: "Skipped unsupported format: {name}",
   unsupportedFormatPath: "Unsupported format: {path}",
   alreadyInLibrary: "This file is already in the library",
@@ -496,6 +497,7 @@ const zh: Record<keyof typeof en, string> = {
 
   importFailed: "导入 {name} 失败:{msg}",
   importedN: "已导入 {n} 个资产",
+  importProgress: "正在导入 {current}/{total} — {name}",
   unsupportedFormat: "跳过不支持的格式:{name}",
   unsupportedFormatPath: "不支持的格式:{path}",
   alreadyInLibrary: "该文件已在库中",

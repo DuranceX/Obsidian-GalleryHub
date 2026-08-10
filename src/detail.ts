@@ -256,30 +256,31 @@ export class DetailModal extends Modal {
     bar.createDiv({ cls: "ghub-fmeta", text: fmeta.join("  ·  ") });
 
     // ---- 星级点选(悬停预览填充)----
+    // 星星只创建一次,悬停/点击仅切换 class。若在 mouseenter 里重建 DOM,
+    // mousedown 的目标元素会在 mouseup 前被销毁,浏览器不派发 click(点星无反应)。
     const starRow = bar.createDiv({
       cls: "ghub-starpick",
       attr: { role: "radiogroup", "aria-label": t("ratingAria") },
     });
-    const renderStars = (preview?: number) => {
-      starRow.empty();
-      const shown = preview ?? this.item.rating;
-      for (let i = 1; i <= 5; i++) {
-        const s = starRow.createSpan({
-          text: "★",
-          cls: shown >= i ? "on" : "",
-          attr: { role: "radio", "aria-label": t("nStars", { n: i }) },
-        });
-        s.addEventListener("click", () => {
-          this.patch({ rating: this.item.rating === i ? 0 : i });
-          renderStars();
-        });
-        s.addEventListener("mouseenter", () => renderStars(i));
-      }
-      starRow.addEventListener("mouseleave", () => renderStars(), {
-        once: true,
-      });
+    const stars: HTMLElement[] = [];
+    const paintStars = (shown: number) => {
+      stars.forEach((s, idx) => s.toggleClass("on", idx < shown));
     };
-    renderStars();
+    for (let i = 1; i <= 5; i++) {
+      const s = starRow.createSpan({
+        text: "★",
+        attr: { role: "radio", "aria-label": t("nStars", { n: i }) },
+      });
+      stars.push(s);
+      s.addEventListener("click", () => {
+        const next = this.item.rating === i ? 0 : i;
+        this.patch({ rating: next });
+        paintStars(next);
+      });
+      s.addEventListener("mouseenter", () => paintStars(i));
+    }
+    starRow.addEventListener("mouseleave", () => paintStars(this.item.rating));
+    paintStars(it.rating);
 
     // ---- 标签 chips 编辑器 ----
     const tagField = bar.createDiv({ cls: "ghub-field" });

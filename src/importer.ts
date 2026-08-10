@@ -22,6 +22,32 @@ async function probeImageSize(
   }
 }
 
+/** 批量导入进度条(常驻 Notice,内嵌进度条与文件名) */
+class ImportProgress {
+  private notice: Notice;
+  private barEl: HTMLElement;
+  private textEl: HTMLElement;
+
+  constructor(private total: number) {
+    this.notice = new Notice("", 0); // 0 = 不自动消失
+    const wrap = this.notice.noticeEl.createDiv({ cls: "ghub-import-progress" });
+    this.textEl = wrap.createDiv({ cls: "ghub-import-progress-text" });
+    const track = wrap.createDiv({ cls: "ghub-import-progress-track" });
+    this.barEl = track.createDiv({ cls: "ghub-import-progress-bar" });
+  }
+
+  update(current: number, fileName: string): void {
+    this.textEl.setText(
+      t("importProgress", { current, total: this.total, name: fileName })
+    );
+    this.barEl.style.width = `${Math.round((current / this.total) * 100)}%`;
+  }
+
+  done(): void {
+    this.notice.hide();
+  }
+}
+
 /** 导入外部文件(File 对象,来自 <input type=file> 或拖拽)到 assets/ 并入库 */
 export class Importer {
   constructor(private app: App, private store: GalleryStore) {}
@@ -36,14 +62,23 @@ export class Importer {
     files: FileList | File[],
     folder?: string
   ): Promise<number> {
+    const list = Array.from(files);
     const batch: GalleryItem[] = [];
-    for (const file of Array.from(files)) {
-      try {
-        const item = await this.buildItem(file, folder);
-        if (item) batch.push(item);
-      } catch (e) {
-        new Notice(t("importFailed", { name: file.name, msg: (e as Error).message }), 6000);
+    // 批量导入(>3 个)显示进度条 Notice
+    const progress = list.length > 3 ? new ImportProgress(list.length) : null;
+    try {
+      for (let i = 0; i < list.length; i++) {
+        const file = list[i];
+        progress?.update(i + 1, file.name);
+        try {
+          const item = await this.buildItem(file, folder);
+          if (item) batch.push(item);
+        } catch (e) {
+          new Notice(t("importFailed", { name: file.name, msg: (e as Error).message }), 6000);
+        }
       }
+    } finally {
+      progress?.done();
     }
     // 整批一次性入库:单次刷新、单次保存
     this.store.addItems(batch);
