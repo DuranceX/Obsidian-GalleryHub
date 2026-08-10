@@ -154,8 +154,8 @@ class GalleryHubSettingTab extends PluginSettingTab {
       .setDesc("画廊界面的配色。「跟随 Obsidian」会随应用的明暗主题自动切换。")
       .addDropdown((d) =>
         d
-          .addOption("dark", "暗色(暗房)")
-          .addOption("light", "浅色(画廊)")
+          .addOption("dark", "暗色")
+          .addOption("light", "浅色")
           .addOption("follow", "跟随 Obsidian")
           .setValue(this.plugin.settings.colorMode)
           .onChange(async (v) => {

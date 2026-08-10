@@ -1034,6 +1034,12 @@
   padding: 0;
 }
 
+/* 添加链接等小弹窗的头部:不需要给关闭按钮腾位,取消下移 */
+.ghub-addlink-head {
+  margin-top: 0 !important;
+  margin-bottom: 14px;
+}
+
 /* ================= 窄窗自适应 ================= */
 @media (max-width: 640px) {
   .ghub-root {

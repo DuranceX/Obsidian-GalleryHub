@@ -594,25 +594,47 @@ export class AddLinkModal extends Modal {
     this.modalEl.addClass("ghub-detail-modal", "ghub-addlink", this.themeClass);
     const { contentEl } = this;
     const bar = contentEl.createDiv({ cls: "ghub-panelbar" });
-    bar.createEl("h3", { text: "添加链接" });
+
+    // 头部:图标 + 标题(与详情页头部风格一致)
+    const head = bar.createDiv({ cls: "ghub-d-head ghub-addlink-head" });
+    const badge = head.createSpan({ cls: "ghub-d-type" });
+    const ic = badge.createSpan();
+    setIcon(ic, "link");
+    badge.createSpan({ text: "添加链接" });
+
     let url = "";
     let title = "";
     const f1 = bar.createDiv({ cls: "ghub-field" });
-    f1.createDiv({ cls: "ghub-field-label", text: "URL" });
+    f1.createDiv({ cls: "ghub-field-label" }).createSpan({ text: "URL" });
     const urlInput = f1.createEl("input", {
       attr: { type: "text", placeholder: "https://…" },
     });
     urlInput.addEventListener("input", () => (url = urlInput.value.trim()));
     const f2 = bar.createDiv({ cls: "ghub-field" });
-    f2.createDiv({ cls: "ghub-field-label", text: "标题(可选)" });
-    const titleInput = f2.createEl("input", { attr: { type: "text" } });
+    f2.createDiv({ cls: "ghub-field-label" }).createSpan({ text: "标题(可选)" });
+    const titleInput = f2.createEl("input", {
+      attr: { type: "text", placeholder: "留空自动取域名" },
+    });
     titleInput.addEventListener("input", () => (title = titleInput.value.trim()));
-    const actions = bar.createDiv({ cls: "ghub-actions" });
-    const ok = actions.createEl("button", { text: "添加", cls: "mod-cta" });
-    ok.addEventListener("click", () => {
+
+    const submit = () => {
       this.onSubmit(url, title);
       this.close();
+    };
+    urlInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submit();
     });
+    titleInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submit();
+    });
+
+    const actions = bar.createDiv({ cls: "ghub-actions" });
+    const ok = actions.createEl("button", { text: "添加", cls: "mod-cta" });
+    ok.addEventListener("click", submit);
+    const cancel = actions.createEl("button", { text: "取消" });
+    cancel.addEventListener("click", () => this.close());
+
+    window.setTimeout(() => urlInput.focus(), 30);
   }
 
   onClose(): void {
