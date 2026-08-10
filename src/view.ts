@@ -343,7 +343,6 @@ export class GalleryView extends ItemView {
       });
       video.dataset.src = this.app.vault.adapter.getResourcePath(it.path);
       this.observer?.observe(video);
-      thumb.createDiv({ cls: "ghub-badge", text: "▶ VIDEO" });
       card.addEventListener(
         "mouseenter",
         () => void video.play().catch(() => {})
@@ -363,25 +362,18 @@ export class GalleryView extends ItemView {
       }
     }
 
-    // 信息区(工作台式外显)
-    const body = card.createDiv({ cls: "ghub-card-body" });
-    body.createDiv({ cls: "ghub-card-title", text: it.title || "(无标题)" });
-
-    const sub = body.createDiv({ cls: "ghub-card-sub" });
+    // 覆盖层:悬停/聚焦时浮现的元数据(画面优先,不占卡片空间)
+    const veil = card.createDiv({ cls: "ghub-veil" });
+    const top = veil.createDiv({ cls: "ghub-veil-top" });
+    if (it.gen.prompt) top.createSpan({ cls: "ghub-chip-p", text: "PROMPT" });
+    if (it.type === "video") top.createSpan({ cls: "ghub-chip-v", text: "▶ VIDEO" });
+    const bottom = veil.createDiv({ cls: "ghub-veil-bottom" });
+    bottom.createDiv({ cls: "ghub-vtitle", text: it.title || "(无标题)" });
+    const meta = bottom.createDiv({ cls: "ghub-veil-meta" });
     if (it.rating > 0)
-      sub.createSpan({ text: "★".repeat(it.rating), cls: "ghub-stars" });
-    if (it.gen.model)
-      sub.createSpan({ text: it.gen.model, cls: "ghub-card-model" });
-
-    if (it.gen.prompt) {
-      body.createDiv({ cls: "ghub-prompt-snippet", text: it.gen.prompt });
-    }
-
-    if (it.tags.length) {
-      const tags = body.createDiv({ cls: "ghub-card-tags" });
-      for (const t of it.tags.slice(0, 4))
-        tags.createSpan({ cls: "ghub-ctag", text: t });
-    }
+      meta.createSpan({ text: "★".repeat(it.rating), cls: "ghub-stars" });
+    if (it.gen.model) meta.createSpan({ text: it.gen.model });
+    if (it.tags.length) meta.createSpan({ text: it.tags.slice(0, 2).join(" · ") });
 
     const open = (e: MouseEvent | KeyboardEvent) => {
       if (
