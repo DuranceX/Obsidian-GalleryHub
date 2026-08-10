@@ -599,11 +599,11 @@ export class CanvasBoard {
         if (be)
           this.store.updateBoardElement(this.boardId, id, { x: be.x, y: be.y }, true);
       }
-      const cids = [...cardOrigin.keys()];
-      cids.forEach((id, i) => {
+      // 同上:位置变更 quiet 落库,不触发画布重建
+      for (const id of cardOrigin.keys()) {
         const p = this.store.getItem(id)?.layouts[this.boardId];
-        if (p) this.store.setLayout(id, this.boardId, { ...p }, i < cids.length - 1 || elOrigin.size > 0);
-      });
+        if (p) this.store.setLayout(id, this.boardId, { ...p }, true);
+      }
     };
     node.addEventListener("pointerup", endDrag);
     node.addEventListener("pointercancel", endDrag);
@@ -955,17 +955,13 @@ export class CanvasBoard {
       }
       // 拖动结束后再真正置顶(DOM 移动 + z 序落库)
       this.bringToFront(it, node);
+      // 位置全部 quiet 落库:拖动过程中 DOM 已就位,
+      // 触发全量通知会导致画布 renderAll 重建(整屏闪一下),纯浪费
       const ids = [...dragOrigin.keys()];
-      ids.forEach((id, i) => {
+      for (const id of ids) {
         const p = this.store.getItem(id)?.layouts[this.boardId];
-        if (p)
-          this.store.setLayout(
-            id,
-            this.boardId,
-            { ...p },
-            i < ids.length - 1 || dragElOrigin.size > 0
-          );
-      });
+        if (p) this.store.setLayout(id, this.boardId, { ...p }, true);
+      }
       for (const id of dragElOrigin.keys()) {
         const be = this.store
           .boardElements(this.boardId)
