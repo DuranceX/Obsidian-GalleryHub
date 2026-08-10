@@ -12,7 +12,7 @@ import {
 
 export const VIEW_TYPE_GALLERY = "gallery-hub-view";
 
-type RatingFilter = "all" | "unrated" | 4 | 5;
+type RatingFilter = "all" | "unrated" | "below3" | 3 | 4 | 5;
 
 interface FilterState {
   search: string;
@@ -323,6 +323,17 @@ export class GalleryView extends ItemView {
 
   // ---------- 画布模式 ----------
 
+  /** 侧边栏点击画布:切到画布模式并打开 */
+  private openBoardFromSidebar(id: string): void {
+    this.activeBoardId = id;
+    if (this.mode !== "canvas") {
+      this.setMode("canvas");
+    } else {
+      this.openBoard(id);
+    }
+    this.renderSidebar();
+  }
+
   private setMode(mode: "grid" | "canvas"): void {
     if (this.mode === mode) return;
     this.mode = mode;
@@ -340,6 +351,7 @@ export class GalleryView extends ItemView {
       this.canvas?.destroy();
       this.canvas = null;
       this.renderGrid();
+      this.renderSidebar(); // 清除侧边栏画布模块的选中态
     }
   }
 
@@ -381,6 +393,7 @@ export class GalleryView extends ItemView {
       this.importer
     );
     this.refreshBoardSelect();
+    this.renderSidebar(); // 更新侧边栏画布模块的选中态
     this.countEl.setText(
       `${this.store.itemsOnBoard(id).length} 项在画布上`
     );
@@ -580,6 +593,33 @@ export class GalleryView extends ItemView {
       for (const node of tree) this.renderTreeNode(treeEl, node, 0);
     }
 
+    // 画布(在文件夹与类型之间)
+    if (cfg.showBoards) {
+      const bhead = side.createDiv({ cls: "ghub-side-head" });
+      bhead.createEl("h3", { text: "画布" });
+      const baddBtn = bhead.createEl("button", {
+        cls: "ghub-mini-btn",
+        attr: { "aria-label": "新建画布" },
+      });
+      setIcon(baddBtn, "plus");
+      baddBtn.addEventListener("click", () => {
+        const id = this.store.createBoard(
+          `画布 ${Object.keys(this.store.getBoards()).length + 1}`
+        );
+        if (id) this.openBoardFromSidebar(id);
+      });
+      for (const [id, meta] of Object.entries(this.store.getBoards())) {
+        this.fitem(
+          side,
+          "frame",
+          meta.name,
+          this.store.itemsOnBoard(id).length,
+          this.mode === "canvas" && this.activeBoardId === id,
+          () => this.openBoardFromSidebar(id)
+        );
+      }
+    }
+
     // 类型
     if (cfg.showTypes) {
       side.createEl("h3", { text: "类型" });
@@ -604,6 +644,8 @@ export class GalleryView extends ItemView {
         ["all", "全部评分", all.length],
         [5, "★★★★★", all.filter((i) => i.rating === 5).length],
         [4, "★★★★ 以上", all.filter((i) => i.rating >= 4).length],
+        [3, "★★★ 以上", all.filter((i) => i.rating >= 3).length],
+        ["below3", "★★★ 以下", all.filter((i) => i.rating > 0 && i.rating < 3).length],
         ["unrated", "未评分", all.filter((i) => i.rating === 0).length],
       ];
       for (const [val, label, n] of rateDefs) {
@@ -975,10 +1017,14 @@ export class GalleryView extends ItemView {
       if (f.type !== "all" && it.type !== f.type) return false;
       if (f.rating === "unrated") {
         if (it.rating !== 0) return false;
+      } else if (f.rating === "below3") {
+        if (!(it.rating > 0 && it.rating < 3)) return false;
       } else if (f.rating === 5) {
         if (it.rating !== 5) return false;
       } else if (f.rating === 4) {
         if (it.rating < 4) return false;
+      } else if (f.rating === 3) {
+        if (it.rating < 3) return false;
       }
       if (f.tags.size && ![...f.tags].every((t) => it.tags.includes(t)))
         return false;

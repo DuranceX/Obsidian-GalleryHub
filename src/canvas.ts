@@ -1,6 +1,6 @@
 import { App, Menu, setIcon } from "obsidian";
 import { GalleryStore } from "./store";
-import { GalleryItem, LayoutPos, BoardElement } from "./types";
+import { GalleryItem, LayoutPos, BoardElement, ELEMENT_COLORS } from "./types";
 import { DetailModal } from "./detail";
 import { Importer } from "./importer";
 
@@ -271,9 +271,16 @@ export class CanvasBoard {
 
   private focusElementEditor(elId: string): void {
     const node = this.worldEl.querySelector<HTMLElement>(
-      `.ghub-cel[data-id="${elId}"] .ghub-cel-text`
+      `.ghub-cel[data-id="${elId}"]`
     );
-    node?.focus();
+    // 触发元素自身的双击编辑逻辑
+    node?.dispatchEvent(new MouseEvent("dblclick", { bubbles: false }));
+  }
+
+  /** 应用元素颜色(CSS 变量供样式取用) */
+  private applyElementColor(node: HTMLElement, el: BoardElement): void {
+    if (el.color) node.style.setProperty("--cel-color", el.color);
+    else node.style.removeProperty("--cel-color");
   }
 
   private isEditableTarget(e: Event): boolean {
@@ -329,17 +336,41 @@ export class CanvasBoard {
     node.style.top = `${el.y}px`;
     node.style.width = `${el.w}px`;
     if (el.kind === "frame") node.style.height = `${el.h}px`;
+    this.applyElementColor(node, el);
 
     // 可编辑文本(text:正文;frame:左上角标题)
+    // 默认不可编辑(保证单击可拖动),双击进入编辑
     const textEl = node.createDiv({
       cls: "ghub-cel-text",
-      attr: { contenteditable: "true", spellcheck: "false" },
+      attr: { contenteditable: "false", spellcheck: "false" },
     });
     textEl.setText(el.text);
     if (el.kind === "text" && !el.text) {
-      textEl.dataset.placeholder = "输入文字…";
+      textEl.dataset.placeholder = "双击输入文字…";
     }
+    const startEdit = () => {
+      textEl.setAttribute("contenteditable", "true");
+      node.addClass("is-editing");
+      textEl.focus();
+      // 光标移到末尾
+      const range = document.createRange();
+      range.selectNodeContents(textEl);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    };
+    textEl.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      startEdit();
+    });
+    node.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      startEdit();
+    });
     textEl.addEventListener("blur", () => {
+      textEl.setAttribute("contenteditable", "false");
+      node.removeClass("is-editing");
       const v = textEl.textContent ?? "";
       if (v !== el.text)
         this.store.updateBoardElement(this.boardId, el.id, { text: v }, true);
@@ -349,9 +380,12 @@ export class CanvasBoard {
       e.stopPropagation(); // 空格等按键不触发画布平移
       if (e.key === "Escape") textEl.blur();
     });
-    textEl.addEventListener("pointerdown", (e) => e.stopPropagation());
+    // 编辑中阻止拖拽;非编辑状态让事件冒泡给 node 以支持拖动
+    textEl.addEventListener("pointerdown", (e) => {
+      if (textEl.getAttribute("contenteditable") === "true") e.stopPropagation();
+    });
 
-    // 拖拽移动(文本区之外的部分)
+    // 拖拽移动(编辑中除外)
     let dragging = false;
     let sx = 0;
     let sy = 0;
@@ -359,8 +393,8 @@ export class CanvasBoard {
     let oy = 0;
     node.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
-      if ((e.target as HTMLElement).closest(".ghub-cel-text, .ghub-cel-resize"))
-        return;
+      if (node.hasClass("is-editing")) return;
+      if ((e.target as HTMLElement).closest(".ghub-cel-resize")) return;
       dragging = true;
       sx = e.clientX;
       sy = e.clientY;
@@ -446,8 +480,25 @@ export class CanvasBoard {
       e.stopPropagation();
       const menu = new Menu();
       menu.addItem((mi) =>
-        mi.setTitle("编辑文字").setIcon("pencil").onClick(() => textEl.focus())
+        mi.setTitle("编辑文字").setIcon("pencil").onClick(() => startEdit())
       );
+      // 颜色子项
+      for (const [color, label] of ELEMENT_COLORS) {
+        menu.addItem((mi) => {
+          mi.setTitle(`颜色:${label}`)
+            .setIcon(el.color === color || (!el.color && !color) ? "check" : "palette")
+            .onClick(() => {
+              el.color = color || undefined;
+              this.store.updateBoardElement(
+                this.boardId,
+                el.id,
+                { color: el.color },
+                true
+              );
+              this.applyElementColor(node, el);
+            });
+        });
+      }
       menu.addSeparator();
       menu.addItem((mi) =>
         mi.setTitle("删除").setIcon("trash-2").onClick(() => {

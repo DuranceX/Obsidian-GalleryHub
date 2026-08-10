@@ -184,7 +184,7 @@ class GalleryHubSettingTab extends PluginSettingTab {
     const moduleToggle = (
       name: string,
       desc: string,
-      key: "showFolders" | "showTypes" | "showRatings" | "showTags"
+      key: "showFolders" | "showBoards" | "showTypes" | "showRatings" | "showTags"
     ) => {
       new Setting(containerEl)
         .setName(name)
@@ -198,6 +198,7 @@ class GalleryHubSettingTab extends PluginSettingTab {
         );
     };
     moduleToggle("文件树", "assets 目录树(含新建/重命名/拖拽)", "showFolders");
+    moduleToggle("画布", "画布列表(点击直接打开)", "showBoards");
     moduleToggle("类型", "全部/图片/视频/链接 筛选", "showTypes");
     moduleToggle("评分", "按星级筛选", "showRatings");
     moduleToggle("标签", "标签云筛选", "showTags");

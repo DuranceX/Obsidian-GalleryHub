@@ -19,6 +19,7 @@ export interface GalleryHubSettings {
   defaultFolder: string;
   /** 侧边栏模块开关 */
   showFolders: boolean;
+  showBoards: boolean;
   showTypes: boolean;
   showRatings: boolean;
   showTags: boolean;
@@ -28,6 +29,7 @@ export const DEFAULT_SETTINGS: GalleryHubSettings = {
   colorMode: "dark",
   defaultFolder: "",
   showFolders: true,
+  showBoards: true,
   showTypes: true,
   showRatings: true,
   showTags: true,
@@ -94,7 +96,21 @@ export interface BoardElement {
   h: number;
   /** text: 文字内容;frame: 框标题 */
   text: string;
+  /** 颜色(色板 key 或 CSS 颜色),空 = 默认(文字随主题/框用琥珀) */
+  color?: string;
 }
+
+/** 画布元素预设色板 */
+export const ELEMENT_COLORS: Array<[string, string]> = [
+  ["", "默认"],
+  ["#e8b04b", "琥珀"],
+  ["#e06c5b", "绯红"],
+  ["#6fbf73", "松绿"],
+  ["#5b9dd9", "湖蓝"],
+  ["#a06cd5", "紫藤"],
+  ["#d95b9a", "桃粉"],
+  ["#9a9791", "石灰"],
+];
 
 export interface GalleryData {
   version: number;

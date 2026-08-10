@@ -1547,8 +1547,18 @@
 .ghub-cel.ghub-cel-text .ghub-cel-text {
   font-size: 18px;
   line-height: 1.5;
-  color: var(--ghub-text);
+  color: var(--cel-color, var(--ghub-text));
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  cursor: inherit;
+}
+
+.ghub-cel.is-editing {
+  cursor: text;
+}
+
+.ghub-cel.is-editing .ghub-cel-text {
+  cursor: text;
+  user-select: text;
 }
 
 .ghub-cel.ghub-cel-text:hover {
@@ -1557,14 +1567,14 @@
 
 /* 画框元素 */
 .ghub-cel.ghub-cel-frame {
-  border: 2px solid color-mix(in srgb, var(--ghub-accent) 55%, transparent);
+  border: 2px solid color-mix(in srgb, var(--cel-color, var(--ghub-accent)) 55%, transparent);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--ghub-accent) 5%, transparent);
+  background: color-mix(in srgb, var(--cel-color, var(--ghub-accent)) 5%, transparent);
   cursor: grab;
 }
 
 .ghub-cel.ghub-cel-frame:hover {
-  border-color: var(--ghub-accent);
+  border-color: var(--cel-color, var(--ghub-accent));
 }
 
 .ghub-cel.ghub-cel-frame .ghub-cel-text {
@@ -1574,7 +1584,7 @@
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--ghub-accent);
+  color: var(--cel-color, var(--ghub-accent));
   background: var(--ghub-stage);
   padding: 1px 8px;
   border-radius: 5px;
