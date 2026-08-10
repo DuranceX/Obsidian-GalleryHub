@@ -1,6 +1,6 @@
 /** 与 docs/03-数据设计.md 对应的类型契约 */
 
-export type ItemType = "image" | "video" | "audio" | "link";
+export type ItemType = "image" | "video" | "audio" | "link" | "note";
 
 /** 插件颜色模式 */
 export type ColorMode = "light" | "dark" | "follow";

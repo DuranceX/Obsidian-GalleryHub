@@ -378,6 +378,16 @@ export class GalleryView extends ItemView {
       }).open();
     });
 
+    const noteBtn = bar.createEl("button", {
+      text: t("addNote"),
+      attr: { "aria-label": t("addNoteAria") },
+    });
+    noteBtn.addEventListener("click", () => {
+      const id = this.importer.addNote();
+      const it = this.store.getItem(id);
+      if (it) this.openDetail(it); // 直接进详情编辑正文
+    });
+
     this.updateToolbarMode();
   }
 
@@ -695,6 +705,7 @@ export class GalleryView extends ItemView {
         ["video", "film", t("video"), all.filter((i) => i.type === "video").length],
         ["audio", "music", t("audio"), all.filter((i) => i.type === "audio").length],
         ["link", "link", t("link"), all.filter((i) => i.type === "link").length],
+        ["note", "sticky-note", t("note"), all.filter((i) => i.type === "note").length],
       ];
       for (const [val, icon, label, n] of typeDefs) {
         this.fitem(side, icon, label, n, this.filter.type === val, () => {
@@ -1210,7 +1221,7 @@ export class GalleryView extends ItemView {
       const cardEl = this.card(it);
       this.gridCardEls.set(it.id, cardEl);
       cols[target].appendChild(cardEl);
-      // 估算卡片高度占比:图片按宽高比;音频/链接为紧凑固定高;视频兜底 4:3
+      // 估算卡片高度占比:图片按宽高比;音频/链接/笔记为紧凑固定高;视频兜底 4:3
       const ratio =
         it.w && it.h
           ? it.h / it.w
@@ -1218,7 +1229,9 @@ export class GalleryView extends ItemView {
             ? 0.52
             : it.type === "link"
               ? 0.32
-              : 0.75;
+              : it.type === "note"
+                ? Math.min(0.9, 0.28 + (it.note ? Math.min(it.note.length / 400, 0.5) : 0))
+                : 0.75;
       heights[target] += ratio + 0.06; // 0.06 ≈ 卡片间距占比
     }
   }
@@ -1240,7 +1253,7 @@ export class GalleryView extends ItemView {
             b.rating - a.rating || b.createdAt.localeCompare(a.createdAt)
         );
       case "type": {
-        const order = { image: 0, video: 1, audio: 2, link: 3 };
+        const order = { image: 0, video: 1, audio: 2, link: 3, note: 4 };
         return arr.sort(
           (a, b) =>
             order[a.type] - order[b.type] ||
@@ -1337,10 +1350,23 @@ export class GalleryView extends ItemView {
       } catch {
         /* ignore */
       }
+    } else if (it.type === "note") {
+      const box = thumb.createDiv({ cls: "ghub-notebox" });
+      const head = box.createDiv({ cls: "ghub-audiobox-head" });
+      const ic = head.createDiv({ cls: "ghub-audiobox-icon" });
+      setIcon(ic, "sticky-note");
+      head.createDiv({
+        cls: "ghub-audiobox-title",
+        text: it.title || t("noTitle"),
+      });
+      if (it.note) {
+        // 正文预览:CSS 限高 + 行数截断,超长文本不撑爆卡片
+        box.createDiv({ cls: "ghub-notebox-body", text: it.note });
+      }
     }
 
-    // 覆盖层:悬停浮现元数据(音频/链接卡片信息已外显,不加遮挡)
-    if (it.type !== "audio" && it.type !== "link") {
+    // 覆盖层:悬停浮现元数据(音频/链接/笔记卡片信息已外显,不加遮挡)
+    if (it.type !== "audio" && it.type !== "link" && it.type !== "note") {
       const veil = card.createDiv({ cls: "ghub-veil" });
       const top = veil.createDiv({ cls: "ghub-veil-top" });
       if (it.gen.prompt) top.createSpan({ cls: "ghub-chip-p", text: "PROMPT" });

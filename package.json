@@ -1,6 +1,6 @@
 {
   "name": "obsidian-gallery-hub",
-  "version": "0.10.2",
+  "version": "0.11.0",
   "description": "GalleryHub - art asset gallery plugin for Obsidian (images / videos / links with AI-gen prompt metadata)",
   "main": "dist/main.js",
   "scripts": {

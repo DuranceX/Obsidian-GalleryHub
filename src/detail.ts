@@ -183,6 +183,15 @@ export class DetailModal extends Modal {
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
       setIcon(ic, "link");
       box.createEl("a", { text: it.url, attr: { href: it.url } });
+    } else if (it.type === "note") {
+      // 笔记:舞台即编辑区,大文本框直改 note 字段
+      const box = stage.createDiv({ cls: "ghub-stage-note" });
+      const ta = box.createEl("textarea", {
+        attr: { placeholder: t("notePlaceholder"), spellcheck: "false" },
+      });
+      ta.value = it.note;
+      ta.addEventListener("input", () => this.patch({ note: ta.value }));
+      window.setTimeout(() => ta.focus(), 30);
     }
 
     // ================= 右:信息栏 =================
@@ -198,7 +207,9 @@ export class DetailModal extends Modal {
           ? "film"
           : it.type === "audio"
             ? "music"
-            : "link";
+            : it.type === "note"
+              ? "sticky-note"
+              : "link";
     const ticon = typeBadge.createSpan();
     setIcon(ticon, typeIcon);
     typeBadge.createSpan({
@@ -209,7 +220,9 @@ export class DetailModal extends Modal {
             ? t("video")
             : it.type === "audio"
               ? t("audio")
-              : t("link"),
+              : it.type === "note"
+                ? t("note")
+                : t("link"),
     });
     const headActions = head.createDiv({ cls: "ghub-d-actions" });
     if (it.path) {
@@ -421,12 +434,14 @@ export class DetailModal extends Modal {
     });
     applyCollapsed();
 
-    // ---- 备注 ----
-    this.field(bar, t("noteLabel"), (wrap) => {
-      const ta = wrap.createEl("textarea", { attr: { rows: "3" } });
-      ta.value = it.note;
-      ta.addEventListener("input", () => this.patch({ note: ta.value }));
-    });
+    // ---- 备注(笔记类型的正文在左侧舞台编辑,此处不重复) ----
+    if (it.type !== "note") {
+      this.field(bar, t("noteLabel"), (wrap) => {
+        const ta = wrap.createEl("textarea", { attr: { rows: "3" } });
+        ta.value = it.note;
+        ta.addEventListener("input", () => this.patch({ note: ta.value }));
+      });
+    }
   }
 
   private iconBtn(

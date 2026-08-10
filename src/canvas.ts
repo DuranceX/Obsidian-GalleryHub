@@ -785,15 +785,15 @@ export class CanvasBoard {
     const pos = it.layouts[this.boardId];
     if (!pos) return;
     const node = this.worldEl.createDiv({ cls: "ghub-cnode" });
-    if (it.type === "audio" || it.type === "link")
+    if (it.type === "audio" || it.type === "link" || it.type === "note")
       node.addClass("ghub-cnode-flat");
     this.cardEls.set(it.id, node);
     if (this.selectedIds.has(it.id)) node.addClass("is-selected");
-    const freeform = it.type === "audio" || it.type === "link";
+    const freeform = it.type === "audio" || it.type === "link" || it.type === "note";
     const ratio = it.w && it.h ? it.h / it.w : 0.75;
     const width = pos.w || DEFAULT_CARD_W;
     const height =
-      pos.h ?? (freeform ? (it.type === "audio" ? 96 : 56) : width * ratio);
+      pos.h ?? (freeform ? (it.type === "audio" ? 96 : it.type === "note" ? 140 : 56) : width * ratio);
     node.style.left = `${pos.x}px`;
     node.style.top = `${pos.y}px`;
     node.style.width = `${width}px`;
@@ -834,6 +834,13 @@ export class CanvasBoard {
       });
       audio.src = this.app.vault.adapter.getResourcePath(it.path);
       audio.addEventListener("pointerdown", (e) => e.stopPropagation());
+    } else if (it.type === "note") {
+      const box = node.createDiv({ cls: "ghub-cnode-link ghub-cnode-note" });
+      const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
+      setIcon(ic, "sticky-note");
+      box.createDiv({ text: it.title || "", cls: "ghub-cnode-link-t" });
+      if (it.note)
+        box.createDiv({ text: it.note, cls: "ghub-cnode-note-body" });
     } else if (it.type === "link") {
       const box = node.createDiv({ cls: "ghub-cnode-link" });
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
@@ -1150,12 +1157,12 @@ export class CanvasBoard {
     );
     items.forEach((it, i) => {
       if (it.layouts[this.boardId]) return; // 已在画布上
-      const flat = it.type === "audio" || it.type === "link";
+      const flat = it.type === "audio" || it.type === "link" || it.type === "note";
       const pos: LayoutPos = {
         x: center.x - DEFAULT_CARD_W / 2 + (i % 4) * 40,
         y: center.y - 120 + Math.floor(i / 4) * 40 + i * 12,
         w: flat ? 240 : DEFAULT_CARD_W,
-        h: flat ? (it.type === "audio" ? 96 : 56) : null,
+        h: flat ? (it.type === "audio" ? 96 : it.type === "note" ? 140 : 56) : null,
         z: maxZ + 1 + i,
       };
       this.store.setLayout(it.id, this.boardId, pos, i < items.length - 1);

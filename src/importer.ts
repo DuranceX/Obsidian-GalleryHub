@@ -187,6 +187,26 @@ export class Importer {
     return true;
   }
 
+  /** 新建笔记条目(正文存 note 字段,无文件),返回新条目 id */
+  addNote(): string {
+    const now = new Date().toISOString();
+    const id = newId();
+    this.store.addItem({
+      id,
+      type: "note",
+      createdAt: now,
+      modifiedAt: now,
+      title: "",
+      note: "",
+      tags: [],
+      rating: 0,
+      source: "",
+      gen: emptyGen(),
+      layouts: {},
+    });
+    return id;
+  }
+
   // ================= 文件夹管理(assets/ 目录树 ↔ Hub 文件树) =================
   // 全部使用 assets/ 相对路径("角色/机甲"),"" 表示 assets 根
 
