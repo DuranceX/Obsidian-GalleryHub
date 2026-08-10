@@ -1931,25 +1931,38 @@
   border-color: var(--ghub-border, #2a2d33);
 }
 
-/* ================= 批量导入进度条(Notice 内) ================= */
+/* ================= 批量导入进度条(页面内,工具栏下方) ================= */
 .ghub-import-progress {
-  min-width: 240px;
-  padding: 2px 0;
+  display: none;
+  position: sticky;
+  top: 46px;
+  z-index: 9;
+  margin: 0 0 10px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: var(--ghub-panel);
+  border: 1px solid var(--ghub-border);
+  box-shadow: var(--ghub-shadow);
+}
+
+.ghub-import-progress.is-visible {
+  display: block;
 }
 
 .ghub-import-progress-text {
   font-size: 12px;
-  margin-bottom: 6px;
+  color: var(--ghub-text);
+  margin-bottom: 7px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 320px;
+  font-variant-numeric: tabular-nums;
 }
 
 .ghub-import-progress-track {
   height: 5px;
   border-radius: 3px;
-  background: var(--background-modifier-border);
+  background: var(--ghub-bg);
   overflow: hidden;
 }
 
@@ -1957,7 +1970,7 @@
   height: 100%;
   width: 0;
   border-radius: 3px;
-  background: #e8b04b;
+  background: var(--ghub-accent);
   transition: width 0.15s ease;
 }
 

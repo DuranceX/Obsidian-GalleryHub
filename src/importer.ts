@@ -22,35 +22,21 @@ async function probeImageSize(
   }
 }
 
-/** 批量导入进度条(常驻 Notice,内嵌进度条与文件名) */
-class ImportProgress {
-  private notice: Notice;
-  private barEl: HTMLElement;
-  private textEl: HTMLElement;
-
-  constructor(private total: number) {
-    this.notice = new Notice("", 0); // 0 = 不自动消失
-    const wrap = this.notice.noticeEl.createDiv({ cls: "ghub-import-progress" });
-    this.textEl = wrap.createDiv({ cls: "ghub-import-progress-text" });
-    const track = wrap.createDiv({ cls: "ghub-import-progress-track" });
-    this.barEl = track.createDiv({ cls: "ghub-import-progress-bar" });
-  }
-
-  update(current: number, fileName: string): void {
-    this.textEl.setText(
-      t("importProgress", { current, total: this.total, name: fileName })
-    );
-    this.barEl.style.width = `${Math.round((current / this.total) * 100)}%`;
-  }
-
-  done(): void {
-    this.notice.hide();
-  }
-}
+/** 批量导入进度回调 */
+export type ImportProgressFn = (
+  current: number,
+  total: number,
+  fileName: string
+) => void;
 
 /** 导入外部文件(File 对象,来自 <input type=file> 或拖拽)到 assets/ 并入库 */
 export class Importer {
   constructor(private app: App, private store: GalleryStore) {}
+
+  /** 视图注册的进度监听(页面内进度条);未注册时静默导入 */
+  onProgress: ImportProgressFn | null = null;
+  /** 导入结束(无论成败)回调,用于收起进度条 */
+  onProgressDone: (() => void) | null = null;
 
   private monthBucket(): string {
     const d = new Date();
@@ -64,12 +50,11 @@ export class Importer {
   ): Promise<number> {
     const list = Array.from(files);
     const batch: GalleryItem[] = [];
-    // 批量导入(>3 个)显示进度条 Notice
-    const progress = list.length > 3 ? new ImportProgress(list.length) : null;
+    const showProgress = list.length > 3;
     try {
       for (let i = 0; i < list.length; i++) {
         const file = list[i];
-        progress?.update(i + 1, file.name);
+        if (showProgress) this.onProgress?.(i + 1, list.length, file.name);
         try {
           const item = await this.buildItem(file, folder);
           if (item) batch.push(item);
@@ -78,7 +63,7 @@ export class Importer {
         }
       }
     } finally {
-      progress?.done();
+      if (showProgress) this.onProgressDone?.();
     }
     // 整批一次性入库:单次刷新、单次保存
     this.store.addItems(batch);

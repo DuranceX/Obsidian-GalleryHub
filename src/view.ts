@@ -58,6 +58,9 @@ export class GalleryView extends ItemView {
   private gridEl!: HTMLElement;
   private countEl!: HTMLElement;
   private batchBarEl!: HTMLElement;
+  private progressEl!: HTMLElement;
+  private progressTextEl!: HTMLElement;
+  private progressBarEl!: HTMLElement;
   private observer: IntersectionObserver | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private colCount = 0;
@@ -150,6 +153,26 @@ export class GalleryView extends ItemView {
     const main = root.createDiv({ cls: "ghub-main" });
     this.buildToolbar(main);
     this.batchBarEl = main.createDiv({ cls: "ghub-batchbar" });
+    // 页面内导入进度条(工具栏下方,批量导入时出现)
+    this.progressEl = main.createDiv({ cls: "ghub-import-progress" });
+    this.progressTextEl = this.progressEl.createDiv({
+      cls: "ghub-import-progress-text",
+    });
+    const track = this.progressEl.createDiv({
+      cls: "ghub-import-progress-track",
+    });
+    this.progressBarEl = track.createDiv({ cls: "ghub-import-progress-bar" });
+    this.importer.onProgress = (current, total, name) => {
+      this.progressEl.addClass("is-visible");
+      this.progressTextEl.setText(
+        t("importProgress", { current, total, name })
+      );
+      this.progressBarEl.style.width = `${Math.round((current / total) * 100)}%`;
+    };
+    this.importer.onProgressDone = () => {
+      this.progressEl.removeClass("is-visible");
+      this.progressBarEl.style.width = "0";
+    };
     this.gridEl = main.createDiv({ cls: "ghub-grid" });
     this.canvasHostEl = main.createDiv({ cls: "ghub-canvas-host" });
 
@@ -208,6 +231,9 @@ export class GalleryView extends ItemView {
     this.resizeObserver?.disconnect();
     if (this.resizeTimer !== null) window.clearTimeout(this.resizeTimer);
     this.canvas?.destroy();
+    // 释放进度监听(避免视图关闭后 Importer 持有失效 DOM)
+    this.importer.onProgress = null;
+    this.importer.onProgressDone = null;
   }
 
   // ---------- 顶栏 ----------
