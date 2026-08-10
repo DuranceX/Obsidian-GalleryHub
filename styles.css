@@ -1174,21 +1174,7 @@
   box-shadow: inset 0 0 0 1.5px var(--ghub-accent);
 }
 
-/* ---- 排序下拉 ---- */
-.ghub-root .ghub-sort {
-  background: var(--ghub-panel) !important;
-  border: 1px solid var(--ghub-border) !important;
-  color: var(--ghub-text) !important;
-  border-radius: 8px;
-  font-size: 12px;
-  padding: 5px 8px;
-  cursor: pointer;
-}
-
-.ghub-root .ghub-sort:focus {
-  border-color: var(--ghub-accent) !important;
-  outline: none;
-}
+/* ---- (排序与画布切换均为 .ghub-board-btn 按钮+Menu,select 样式已废弃) ---- */
 
 /* ================= 文件夹选择弹窗 ================= */
 .ghub-folderlist {

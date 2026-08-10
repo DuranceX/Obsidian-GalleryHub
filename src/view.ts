@@ -77,7 +77,7 @@ export class GalleryView extends ItemView {
   private modeBtns: { grid: HTMLElement; canvas: HTMLElement } | null = null;
   private boardBtnEl: HTMLButtonElement | null = null;
   private searchEl: HTMLInputElement | null = null;
-  private sortSelEl: HTMLSelectElement | null = null;
+  private sortBtnEl: HTMLButtonElement | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -285,20 +285,28 @@ export class GalleryView extends ItemView {
 
     this.countEl = bar.createDiv({ cls: "ghub-count" });
 
-    // 排序方式(页面内选项)
-    const sortSel = bar.createEl("select", {
-      cls: "ghub-sort",
+    // 排序方式(按钮 + Menu,与画布切换器统一样式)
+    this.sortBtnEl = bar.createEl("button", {
+      cls: "ghub-board-btn",
       attr: { "aria-label": "排序方式" },
     });
-    for (const [val, label] of SORT_OPTIONS) {
-      sortSel.createEl("option", { text: label, attr: { value: val } });
-    }
-    sortSel.value = this.sortMode;
-    sortSel.addEventListener("change", () => {
-      this.sortMode = sortSel.value as SortMode;
-      this.renderGrid();
+    this.sortBtnEl.addEventListener("click", (e) => {
+      const menu = new Menu();
+      for (const [val, label] of SORT_OPTIONS) {
+        menu.addItem((mi) =>
+          mi
+            .setTitle(label)
+            .setIcon(this.sortMode === val ? "check" : "arrow-up-down")
+            .onClick(() => {
+              this.sortMode = val;
+              this.refreshSortButton();
+              this.renderGrid();
+            })
+        );
+      }
+      menu.showAtMouseEvent(e as MouseEvent);
     });
-    this.sortSelEl = sortSel;
+    this.refreshSortButton();
 
     bar.createDiv({ cls: "ghub-spacer" });
 
@@ -319,6 +327,20 @@ export class GalleryView extends ItemView {
     });
 
     this.updateToolbarMode();
+  }
+
+  /** 刷新排序按钮内容(图标+当前排序名+chevron) */
+  private refreshSortButton(): void {
+    const btn = this.sortBtnEl;
+    if (!btn) return;
+    btn.empty();
+    const ic = btn.createSpan({ cls: "ghub-board-btn-ic" });
+    setIcon(ic, "arrow-up-down");
+    const label =
+      SORT_OPTIONS.find(([v]) => v === this.sortMode)?.[1] ?? "排序";
+    btn.createSpan({ text: label, cls: "ghub-board-btn-t" });
+    const chev = btn.createSpan({ cls: "ghub-board-btn-ic" });
+    setIcon(chev, "chevron-down");
   }
 
   // ---------- 画布模式 ----------
@@ -363,7 +385,7 @@ export class GalleryView extends ItemView {
     if (this.boardBtnEl)
       this.boardBtnEl.style.display = isCanvas ? "" : "none";
     if (this.searchEl) this.searchEl.style.display = isCanvas ? "none" : "";
-    if (this.sortSelEl) this.sortSelEl.style.display = isCanvas ? "none" : "";
+    if (this.sortBtnEl) this.sortBtnEl.style.display = isCanvas ? "none" : "";
     this.refreshBoardSelect();
   }
 
