@@ -8,6 +8,7 @@ import {
   AddLinkModal,
   FolderPickModal,
   ConfirmDeleteModal,
+  BatchEditModal,
 } from "./detail";
 
 export const VIEW_TYPE_GALLERY = "gallery-hub-view";
@@ -506,6 +507,14 @@ export class GalleryView extends ItemView {
           }
         ).open();
       });
+    });
+
+    // 批量编辑(标签/星级)
+    const edit = bar.createEl("button", { text: "编辑…" });
+    edit.addEventListener("click", () => {
+      const items = this.selectedItems();
+      if (!items.length) return;
+      new BatchEditModal(this.app, this.getTheme(), items, this.store).open();
     });
 
     // 发送到画布

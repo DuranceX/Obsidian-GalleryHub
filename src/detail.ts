@@ -433,6 +433,128 @@ export class ConfirmDeleteModal extends Modal {
   }
 }
 
+/** 批量编辑弹窗:标签(追加/替换/移除)与星级 */
+export class BatchEditModal extends Modal {
+  constructor(
+    app: App,
+    private themeClass: string,
+    private items: GalleryItem[],
+    private store: GalleryStore
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.modalEl.addClass("ghub-detail-modal", "ghub-addlink", this.themeClass);
+    const bar = this.contentEl.createDiv({ cls: "ghub-panelbar" });
+    bar.createEl("h3", { text: `批量编辑 ${this.items.length} 个资产` });
+
+    // ---- 标签 ----
+    let tagMode: "add" | "replace" | "remove" = "add";
+    let tagInput = "";
+    const tf = bar.createDiv({ cls: "ghub-field" });
+    tf.createDiv({ cls: "ghub-field-label" }).createSpan({ text: "标签" });
+    const modeRow = tf.createDiv({ cls: "ghub-batch-modes" });
+    const modes: Array<["add" | "replace" | "remove", string]> = [
+      ["add", "追加"],
+      ["replace", "替换全部"],
+      ["remove", "移除"],
+    ];
+    const modeBtns = new Map<string, HTMLElement>();
+    for (const [m, label] of modes) {
+      const b = modeRow.createEl("button", {
+        text: label,
+        cls: m === tagMode ? "is-on" : "",
+      });
+      modeBtns.set(m, b);
+      b.addEventListener("click", () => {
+        tagMode = m;
+        for (const [k, el] of modeBtns) el.toggleClass("is-on", k === m);
+      });
+    }
+    const ti = tf.createEl("input", {
+      attr: { type: "text", placeholder: "逗号分隔多个标签" },
+    });
+    ti.addEventListener("input", () => (tagInput = ti.value));
+
+    // ---- 星级 ----
+    let rating: number | null = null; // null = 不修改
+    const rf = bar.createDiv({ cls: "ghub-field" });
+    rf.createDiv({ cls: "ghub-field-label" }).createSpan({ text: "星级" });
+    const starRow = rf.createDiv({ cls: "ghub-starpick" });
+    const renderStars = () => {
+      starRow.empty();
+      for (let i = 1; i <= 5; i++) {
+        const s = starRow.createSpan({
+          text: "★",
+          cls: rating !== null && rating >= i ? "on" : "",
+        });
+        s.addEventListener("click", () => {
+          rating = rating === i ? null : i;
+          renderStars();
+        });
+      }
+      const hint = starRow.createSpan({
+        cls: "ghub-batch-star-hint",
+        text:
+          rating === null
+            ? "(不修改)"
+            : rating === 0
+              ? "(清除评分)"
+              : `${rating} 星`,
+      });
+      hint.addEventListener("click", () => {
+        rating = rating === 0 ? null : 0;
+        renderStars();
+      });
+    };
+    renderStars();
+    rf.createDiv({
+      cls: "ghub-side-empty",
+      text: "点星星设置;再点取消;点右侧文字在「不修改/清除评分」间切换",
+    });
+
+    // ---- 应用 ----
+    const actions = bar.createDiv({ cls: "ghub-actions" });
+    const apply = actions.createEl("button", { text: "应用", cls: "mod-cta" });
+    apply.addEventListener("click", () => {
+      const tags = tagInput
+        .split(/[,，]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      let changed = 0;
+      for (const it of this.items) {
+        const patch: Partial<GalleryItem> = {};
+        if (tags.length || tagMode === "replace") {
+          if (tagMode === "add") {
+            const merged = [...it.tags];
+            for (const t of tags) if (!merged.includes(t)) merged.push(t);
+            if (merged.length !== it.tags.length) patch.tags = merged;
+          } else if (tagMode === "replace") {
+            if (tags.join("\n") !== it.tags.join("\n")) patch.tags = tags;
+          } else {
+            const left = it.tags.filter((t) => !tags.includes(t));
+            if (left.length !== it.tags.length) patch.tags = left;
+          }
+        }
+        if (rating !== null && it.rating !== rating) patch.rating = rating;
+        if (Object.keys(patch).length) {
+          this.store.updateItem(it.id, patch);
+          changed++;
+        }
+      }
+      new Notice(changed ? `已更新 ${changed} 个资产` : "没有需要修改的内容");
+      this.close();
+    });
+    const cancel = actions.createEl("button", { text: "取消" });
+    cancel.addEventListener("click", () => this.close());
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 /** 添加链接弹窗(暗房皮肤) */
 export class AddLinkModal extends Modal {
   constructor(
