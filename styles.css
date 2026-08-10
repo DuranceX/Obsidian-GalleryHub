@@ -592,11 +592,12 @@
   color: var(--ghub-text);
 }
 
-/* 头部:类型徽标 + 操作图标 */
+/* 头部:类型徽标 + 操作图标(下移避开 modal 右上角关闭按钮) */
 .ghub-d-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-top: 26px;
   margin-bottom: 10px;
 }
 
