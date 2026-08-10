@@ -18,13 +18,16 @@
   --ghub-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-/* ================= 根布局 ================= */
+/* ================= 根布局 =================
+   注意:必须压过主题的 .workspace-leaf-content .view-content 白底,
+   否则亮色主题下整个视图是白的 —— 选择器提级 + !important 锁死 */
+.workspace-leaf-content .view-content.ghub-root,
 .ghub-root {
   display: flex;
   height: 100%;
-  padding: 0;
+  padding: 0 !important;
   overflow: hidden;
-  background: var(--ghub-bg);
+  background: var(--ghub-bg) !important;
   color: var(--ghub-text);
 }
 
@@ -40,7 +43,7 @@
   height: 100%;
   overflow-y: auto;
   padding: 14px 10px 24px;
-  background: var(--ghub-bg-side);
+  background: var(--ghub-bg-side) !important;
   border-right: 1px solid var(--ghub-border);
 }
 
@@ -154,6 +157,7 @@
   height: 100%;
   overflow-y: auto;
   padding: 0 12px 32px;
+  background: var(--ghub-bg);
 }
 
 .ghub-toolbar {
@@ -171,12 +175,12 @@
 .ghub-root .ghub-search {
   flex: 0 1 320px;
   min-width: 160px;
-  background: var(--ghub-panel);
-  border: 1px solid var(--ghub-border);
+  background: var(--ghub-panel) !important;
+  border: 1px solid var(--ghub-border) !important;
   border-radius: 18px;
   padding: 6px 14px;
   font-size: 12.5px;
-  color: var(--ghub-text);
+  color: var(--ghub-text) !important;
 }
 
 .ghub-root .ghub-search::placeholder {
@@ -199,30 +203,30 @@
 }
 
 .ghub-root button {
-  background: var(--ghub-panel);
-  border: 1px solid var(--ghub-border);
-  color: var(--ghub-text);
+  background: var(--ghub-panel) !important;
+  border: 1px solid var(--ghub-border) !important;
+  color: var(--ghub-text) !important;
   font-size: 12.5px;
   border-radius: 8px;
   padding: 6px 14px;
   cursor: pointer;
-  box-shadow: none;
+  box-shadow: none !important;
 }
 
 .ghub-root button:hover {
-  background: var(--ghub-panel-2);
-  border-color: #3a3e46;
+  background: var(--ghub-panel-2) !important;
+  border-color: #3a3e46 !important;
 }
 
 .ghub-root button.mod-cta {
-  background: var(--ghub-accent);
-  border-color: var(--ghub-accent);
-  color: var(--ghub-on-accent);
+  background: var(--ghub-accent) !important;
+  border-color: var(--ghub-accent) !important;
+  color: var(--ghub-on-accent) !important;
   font-weight: 600;
 }
 
 .ghub-root button.mod-cta:hover {
-  background: #f0be62;
+  background: #f0be62 !important;
 }
 
 /* ================= 瀑布流(密集,画面优先) ================= */
@@ -398,27 +402,31 @@
   white-space: nowrap;
 }
 
-/* ================= 详情:暗房 Lightbox ================= */
-.ghub-detail-modal {
+/* ================= 详情:暗房 Lightbox =================
+   .modal 在亮色主题下是白底,必须 !important 全部压制 */
+.modal.ghub-detail-modal {
   width: min(92vw, 1360px);
   height: min(88vh, 900px);
   max-width: none;
-  padding: 0;
-  background: #0a0b0d;
+  max-height: none;
+  padding: 0 !important;
+  background: #0a0b0d !important;
   border: 1px solid var(--ghub-border);
   overflow: hidden;
+  color: var(--ghub-text);
 }
 
-.ghub-detail-modal .modal-close-button {
+.modal.ghub-detail-modal .modal-close-button {
   color: #cfccc6;
   z-index: 30;
 }
 
-.ghub-detail-modal .modal-content {
+.modal.ghub-detail-modal .modal-content {
   height: 100%;
   margin: 0;
   padding: 0;
   display: flex;
+  background: transparent;
 }
 
 /* ---- 左:舞台(画面占绝对主体) ---- */
@@ -466,26 +474,32 @@
   flex-shrink: 0;
   height: 100%;
   overflow-y: auto;
-  background: var(--ghub-bg-side);
+  background: var(--ghub-bg-side) !important;
   border-left: 1px solid var(--ghub-border);
   padding: 18px 16px 24px;
   color: var(--ghub-text);
 }
 
+.ghub-panelbar h3 {
+  color: var(--ghub-text);
+}
+
 .ghub-panelbar .ghub-title-input {
   width: 100%;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid transparent;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0;
   font-size: 16px;
   font-weight: 600;
-  color: var(--ghub-text);
+  color: var(--ghub-text) !important;
   padding: 2px 0 6px;
+  box-shadow: none !important;
 }
 
 .ghub-panelbar .ghub-title-input:hover,
 .ghub-panelbar .ghub-title-input:focus {
-  border-bottom-color: var(--ghub-border);
+  border-bottom-color: var(--ghub-border) !important;
   outline: none;
 }
 
@@ -555,10 +569,10 @@
 .ghub-panelbar input[type="text"],
 .ghub-panelbar textarea {
   width: 100%;
-  background: var(--ghub-panel);
-  border: 1px solid var(--ghub-border);
+  background: var(--ghub-panel) !important;
+  border: 1px solid var(--ghub-border) !important;
   border-radius: 7px;
-  color: var(--ghub-text);
+  color: var(--ghub-text) !important;
   font-size: 12px;
   padding: 7px 9px;
 }
@@ -620,13 +634,13 @@
 }
 
 /* ================= 添加链接弹窗(沿用暗房) ================= */
-.ghub-detail-modal.ghub-addlink {
+.modal.ghub-detail-modal.ghub-addlink {
   width: 420px;
   height: auto;
-  padding: 20px;
+  padding: 20px !important;
 }
 
-.ghub-detail-modal.ghub-addlink .modal-content {
+.modal.ghub-detail-modal.ghub-addlink .modal-content {
   display: block;
   height: auto;
 }
