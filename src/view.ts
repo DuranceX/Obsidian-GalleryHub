@@ -536,25 +536,8 @@ export class GalleryView extends ItemView {
 
     // 发送到画布
     const toBoard = bar.createEl("button", { text: "发送到画布" });
-    toBoard.addEventListener("click", () => {
-      const items = this.selectedItems();
-      if (!items.length) return;
-      // 确保有画布
-      let boardId = this.activeBoardId;
-      if (!boardId) {
-        const ids = Object.keys(this.store.getBoards());
-        boardId = ids[0] ?? this.store.createBoard("默认画布");
-        this.activeBoardId = boardId;
-      }
-      if (!boardId) return;
-      this.setMode("canvas");
-      const added = this.canvas?.addItems(items) ?? 0;
-      new Notice(
-        added
-          ? `已放入 ${added} 项到画布`
-          : "所选资产已全部在此画布上"
-      );
-      this.clearSelection();
+    toBoard.addEventListener("click", (e) => {
+      this.sendToBoard(this.selectedItems(), e as MouseEvent);
     });
 
     const del = bar.createEl("button", { text: "删除…", cls: "ghub-danger" });
@@ -1374,19 +1357,46 @@ export class GalleryView extends ItemView {
     ).open();
   }
 
-  /** 发送到画布(与批量栏逻辑一致) */
-  private sendToBoard(items: GalleryItem[]): void {
+  /** 发送到画布:多画布时弹选择菜单,明确目标 */
+  private sendToBoard(items: GalleryItem[], evt?: MouseEvent): void {
     if (!items.length) return;
-    let boardId = this.activeBoardId;
-    if (!boardId) {
-      const ids = Object.keys(this.store.getBoards());
-      boardId = ids[0] ?? this.store.createBoard("默认画布");
-      this.activeBoardId = boardId;
+    const boards = Object.entries(this.store.getBoards());
+    // 单画布(或无画布)直接发,不打扰
+    if (boards.length <= 1) {
+      const boardId = boards[0]?.[0] ?? this.store.createBoard("默认画布");
+      if (boardId) this.doSendToBoard(items, boardId);
+      return;
     }
-    if (!boardId) return;
-    this.setMode("canvas");
+    const menu = new Menu();
+    for (const [id, meta] of boards) {
+      menu.addItem((mi) =>
+        mi
+          .setTitle(meta.name + (id === this.activeBoardId ? "(当前)" : ""))
+          .setIcon("frame")
+          .onClick(() => this.doSendToBoard(items, id))
+      );
+    }
+    menu.addSeparator();
+    menu.addItem((mi) =>
+      mi.setTitle("新建画布并发送").setIcon("plus").onClick(() => {
+        const id = this.store.createBoard(`画布 ${boards.length + 1}`);
+        if (id) this.doSendToBoard(items, id);
+      })
+    );
+    if (evt) menu.showAtMouseEvent(evt);
+    else menu.showAtPosition({ x: window.innerWidth / 2, y: 120 });
+  }
+
+  private doSendToBoard(items: GalleryItem[], boardId: string): void {
+    this.activeBoardId = boardId;
+    if (this.mode !== "canvas") this.setMode("canvas");
+    else this.openBoard(boardId);
     const added = this.canvas?.addItems(items) ?? 0;
-    new Notice(added ? `已放入 ${added} 项到画布` : "所选资产已全部在此画布上");
+    new Notice(
+      added
+        ? `已放入 ${added} 项到「${this.store.getBoards()[boardId]?.name}」`
+        : "所选资产已全部在此画布上"
+    );
     this.clearSelection();
   }
 
