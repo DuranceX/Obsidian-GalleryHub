@@ -1536,6 +1536,24 @@
   font-size: 12.5px;
 }
 
+/* 框选矩形 */
+.ghub-marquee {
+  position: absolute;
+  z-index: 15;
+  border: 1.5px solid var(--ghub-accent);
+  background: color-mix(in srgb, var(--ghub-accent) 12%, transparent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* 画布卡片选中态 */
+.ghub-cnode.is-selected {
+  outline: 2px solid var(--ghub-accent);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ghub-accent) 22%, transparent),
+    0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
 /* ================= 画布悬浮工具栏 ================= */
 .ghub-cbar {
   position: absolute;

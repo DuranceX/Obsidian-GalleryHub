@@ -29,6 +29,8 @@ export class CanvasBoard {
   private scale = 1;
   /** 卡片 DOM 索引 */
   private cardEls = new Map<string, HTMLElement>();
+  /** 框选中的卡片 id */
+  private selectedIds = new Set<string>();
   private detachFns: Array<() => void> = [];
 
   constructor(
@@ -108,17 +110,27 @@ export class CanvasBoard {
       });
     });
 
-    // ---- 平移:空白左键 / 中键 / 空格+左键 ----
+    // ---- 平移:中键 / 空格+左键;左键空白改为框选 ----
     let panning = false;
     let spaceHeld = false;
     let lastX = 0;
     let lastY = 0;
 
     const keydown = (e: KeyboardEvent) => {
-      if (e.code === "Space" && !this.isEditableTarget(e)) {
+      if (this.isEditableTarget(e)) return;
+      if (e.code === "Space") {
         spaceHeld = true;
         host.addClass("is-pan-ready");
         e.preventDefault();
+      }
+      if (e.key === "Escape") this.clearSelection();
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (this.selectedIds.size) {
+          for (const id of this.selectedIds)
+            this.store.setLayout(id, this.boardId, null, true);
+          this.selectedIds.clear();
+          this.renderAll();
+        }
       }
     };
     const keyup = (e: KeyboardEvent) => {
@@ -134,40 +146,83 @@ export class CanvasBoard {
       window.removeEventListener("keyup", keyup);
     });
 
+    // 框选状态
+    let marquee: HTMLElement | null = null;
+    let mx0 = 0;
+    let my0 = 0;
+    let marqueeMoved = false;
+
     host.addEventListener("pointerdown", (e) => {
       const onNode = (e.target as HTMLElement).closest(
         ".ghub-cnode, .ghub-cel, .ghub-cbar"
       );
-      const panButton =
-        e.button === 1 || (e.button === 0 && (spaceHeld || !onNode));
-      if (!panButton) return;
-      panning = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      host.addClass("is-panning");
-      host.setPointerCapture(e.pointerId);
-      e.preventDefault();
+      // 平移:中键任意处 / 空格+左键
+      if (e.button === 1 || (e.button === 0 && spaceHeld)) {
+        panning = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        host.addClass("is-panning");
+        host.setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;
+      }
+      // 框选:左键按在空白处
+      if (e.button === 0 && !onNode) {
+        const rect = host.getBoundingClientRect();
+        mx0 = e.clientX - rect.left;
+        my0 = e.clientY - rect.top;
+        marqueeMoved = false;
+        marquee = host.createDiv({ cls: "ghub-marquee" });
+        marquee.style.left = `${mx0}px`;
+        marquee.style.top = `${my0}px`;
+        host.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      }
     });
     host.addEventListener("pointermove", (e) => {
-      if (!panning) return;
-      this.tx += e.clientX - lastX;
-      this.ty += e.clientY - lastY;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      this.applyTransform();
+      if (panning) {
+        this.tx += e.clientX - lastX;
+        this.ty += e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        this.applyTransform();
+        return;
+      }
+      if (marquee) {
+        const rect = host.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        if (Math.abs(mx - mx0) + Math.abs(my - my0) > 4) marqueeMoved = true;
+        const x = Math.min(mx0, mx);
+        const y = Math.min(my0, my);
+        const w = Math.abs(mx - mx0);
+        const h = Math.abs(my - my0);
+        marquee.style.left = `${x}px`;
+        marquee.style.top = `${y}px`;
+        marquee.style.width = `${w}px`;
+        marquee.style.height = `${h}px`;
+        this.updateMarqueeSelection(x, y, w, h, e.ctrlKey || e.metaKey || e.shiftKey);
+      }
     });
-    const endPan = (e: PointerEvent) => {
-      if (!panning) return;
-      panning = false;
-      host.removeClass("is-panning");
+    const endPointer = (e: PointerEvent) => {
+      if (panning) {
+        panning = false;
+        host.removeClass("is-panning");
+      }
+      if (marquee) {
+        marquee.remove();
+        marquee = null;
+        // 原地单击空白(没拖出框)= 清除选择
+        if (!marqueeMoved) this.clearSelection();
+      }
       try {
         host.releasePointerCapture(e.pointerId);
       } catch {
         /* ignore */
       }
     };
-    host.addEventListener("pointerup", endPan);
-    host.addEventListener("pointercancel", endPan);
+    host.addEventListener("pointerup", endPointer);
+    host.addEventListener("pointercancel", endPointer);
 
     // ---- 缩放:滚轮,以指针为中心 ----
     host.addEventListener(
@@ -286,6 +341,40 @@ export class CanvasBoard {
   private isEditableTarget(e: Event): boolean {
     const t = e.target as HTMLElement | null;
     return !!t && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable);
+  }
+
+  // ================= 框选 =================
+
+  private clearSelection(): void {
+    this.selectedIds.clear();
+    for (const el of this.cardEls.values()) el.removeClass("is-selected");
+  }
+
+  /** 屏幕矩形与卡片求交,更新选中集(additive=按住 Ctrl/Shift 保留已有选择) */
+  private updateMarqueeSelection(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    additive: boolean
+  ): void {
+    // 屏幕框 → 世界坐标
+    const wx0 = (x - this.tx) / this.scale;
+    const wy0 = (y - this.ty) / this.scale;
+    const wx1 = (x + w - this.tx) / this.scale;
+    const wy1 = (y + h - this.ty) / this.scale;
+    const keep = additive ? new Set(this.selectedIds) : new Set<string>();
+    this.selectedIds = keep;
+    for (const it of this.store.itemsOnBoard(this.boardId)) {
+      const p = it.layouts[this.boardId]!;
+      const ratio = it.w && it.h ? it.h / it.w : 0.75;
+      const cw = p.w || DEFAULT_CARD_W;
+      const ch = p.h ?? cw * ratio;
+      const hit = p.x < wx1 && p.x + cw > wx0 && p.y < wy1 && p.y + ch > wy0;
+      if (hit) this.selectedIds.add(it.id);
+    }
+    for (const [id, el] of this.cardEls)
+      el.toggleClass("is-selected", this.selectedIds.has(id));
   }
 
   private applyTransform(): void {
@@ -551,6 +640,7 @@ export class CanvasBoard {
     if (!pos) return;
     const node = this.worldEl.createDiv({ cls: "ghub-cnode" });
     this.cardEls.set(it.id, node);
+    if (this.selectedIds.has(it.id)) node.addClass("is-selected");
     const ratio = it.w && it.h ? it.h / it.w : 0.75;
     const width = pos.w || DEFAULT_CARD_W;
     const height = pos.h ?? width * ratio;
@@ -595,22 +685,36 @@ export class CanvasBoard {
     // 标题条(悬停显示)
     node.createDiv({ cls: "ghub-cnode-title", text: it.title || "" });
 
-    // ---- 拖拽移动 ----
+    // ---- 拖拽移动(选中集内的卡片群体移动) ----
     let dragging = false;
     let sx = 0;
     let sy = 0;
-    let ox = 0;
-    let oy = 0;
+    /** 拖动开始时各参与卡片的原始位置 */
+    let dragOrigin: Map<string, { x: number; y: number }> = new Map();
     node.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       if ((e.target as HTMLElement).closest(".ghub-cnode-resize")) return;
       if ((e.target as HTMLElement).tagName === "VIDEO") return; // 让视频控件可点
+      if ((e.target as HTMLElement).tagName === "AUDIO") return;
+      // 点击未选中的卡片:清除框选(拖它自己);Ctrl 点击加选
+      if (!this.selectedIds.has(it.id)) {
+        if (e.ctrlKey || e.metaKey) {
+          this.selectedIds.add(it.id);
+          node.addClass("is-selected");
+        } else {
+          this.clearSelection();
+        }
+      }
       dragging = true;
       sx = e.clientX;
       sy = e.clientY;
-      const cur = it.layouts[this.boardId]!;
-      ox = cur.x;
-      oy = cur.y;
+      // 群体拖动:选中集包含本卡则一起动,否则只动自己
+      const ids = this.selectedIds.has(it.id) ? [...this.selectedIds] : [it.id];
+      dragOrigin = new Map();
+      for (const id of ids) {
+        const p = this.store.getItem(id)?.layouts[this.boardId];
+        if (p) dragOrigin.set(id, { x: p.x, y: p.y });
+      }
       node.addClass("is-dragging");
       node.setPointerCapture(e.pointerId);
       this.bringToFront(it, node);
@@ -618,11 +722,18 @@ export class CanvasBoard {
     });
     node.addEventListener("pointermove", (e) => {
       if (!dragging) return;
-      const cur = it.layouts[this.boardId]!;
-      cur.x = ox + (e.clientX - sx) / this.scale;
-      cur.y = oy + (e.clientY - sy) / this.scale;
-      node.style.left = `${cur.x}px`;
-      node.style.top = `${cur.y}px`;
+      const dx = (e.clientX - sx) / this.scale;
+      const dy = (e.clientY - sy) / this.scale;
+      for (const [id, o] of dragOrigin) {
+        const item = this.store.getItem(id);
+        const p = item?.layouts[this.boardId];
+        const el = this.cardEls.get(id);
+        if (!p || !el) continue;
+        p.x = o.x + dx;
+        p.y = o.y + dy;
+        el.style.left = `${p.x}px`;
+        el.style.top = `${p.y}px`;
+      }
     });
     const endDrag = (e: PointerEvent) => {
       if (!dragging) return;
@@ -633,8 +744,11 @@ export class CanvasBoard {
       } catch {
         /* ignore */
       }
-      const cur = it.layouts[this.boardId]!;
-      this.store.setLayout(it.id, this.boardId, { ...cur }, true);
+      const ids = [...dragOrigin.keys()];
+      ids.forEach((id, i) => {
+        const p = this.store.getItem(id)?.layouts[this.boardId];
+        if (p) this.store.setLayout(id, this.boardId, { ...p }, i < ids.length - 1);
+      });
     };
     node.addEventListener("pointerup", endDrag);
     node.addEventListener("pointercancel", endDrag);
