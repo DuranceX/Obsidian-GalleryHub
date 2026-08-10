@@ -797,8 +797,39 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ghub-accent);
+  color: var(--ghub-muted);
   margin-bottom: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ghub-sec-head:hover {
+  color: var(--ghub-text);
+}
+
+.ghub-sec-head:focus-visible {
+  outline: 2px solid var(--ghub-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.ghub-sec-chevron {
+  display: flex;
+  align-items: center;
+  --icon-size: 12px;
+  margin-left: auto;
+}
+
+.ghub-sec-body.is-collapsed {
+  display: none;
+}
+
+.ghub-sec:has(.ghub-sec-body.is-collapsed) {
+  padding-bottom: 2px;
+}
+
+.ghub-sec:has(.ghub-sec-body.is-collapsed) .ghub-sec-head {
+  margin-bottom: 0;
 }
 
 .ghub-sec-icon {
@@ -1755,7 +1786,7 @@
 }
 
 .ghub-cel.ghub-cel-text .ghub-cel-text {
-  font-size: 18px;
+  font-size: var(--cel-fs, 18px);
   line-height: 1.5;
   color: var(--cel-color, var(--ghub-text));
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
@@ -1801,6 +1832,13 @@
   max-width: calc(100% - 20px);
   white-space: nowrap;
   overflow: hidden;
+}
+
+/* 画布元素选中态(与卡片一致) */
+.ghub-cel.is-selected {
+  outline: 2px solid var(--ghub-accent);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ghub-accent) 22%, transparent);
 }
 
 .ghub-cel .ghub-cnode-resize {

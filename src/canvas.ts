@@ -30,8 +30,12 @@ export class CanvasBoard {
   private scale = 1;
   /** 卡片 DOM 索引 */
   private cardEls = new Map<string, HTMLElement>();
+  /** 画布元素(文字/画框)DOM 索引 */
+  private elEls = new Map<string, HTMLElement>();
   /** 框选中的卡片 id */
   private selectedIds = new Set<string>();
+  /** 框选中的画布元素 id */
+  private selectedElIds = new Set<string>();
   private detachFns: Array<() => void> = [];
 
   constructor(
@@ -126,12 +130,7 @@ export class CanvasBoard {
       }
       if (e.key === "Escape") this.clearSelection();
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (this.selectedIds.size) {
-          for (const id of this.selectedIds)
-            this.store.setLayout(id, this.boardId, null, true);
-          this.selectedIds.clear();
-          this.renderAll();
-        }
+        if (this.selectionSize()) this.deleteSelection();
       }
     };
     const keyup = (e: KeyboardEvent) => {
@@ -348,10 +347,28 @@ export class CanvasBoard {
 
   private clearSelection(): void {
     this.selectedIds.clear();
+    this.selectedElIds.clear();
     for (const el of this.cardEls.values()) el.removeClass("is-selected");
+    for (const el of this.elEls.values()) el.removeClass("is-selected");
   }
 
-  /** 屏幕矩形与卡片求交,更新选中集(additive=按住 Ctrl/Shift 保留已有选择) */
+  /** 选中集总数(卡片+元素) */
+  private selectionSize(): number {
+    return this.selectedIds.size + this.selectedElIds.size;
+  }
+
+  /** 删除选中:卡片移出画布,元素删除 */
+  private deleteSelection(): void {
+    for (const id of this.selectedIds)
+      this.store.setLayout(id, this.boardId, null, true);
+    for (const id of this.selectedElIds)
+      this.store.deleteBoardElement(this.boardId, id);
+    this.selectedIds.clear();
+    this.selectedElIds.clear();
+    this.renderAll();
+  }
+
+  /** 屏幕矩形与卡片/元素求交,更新选中集(additive=按住 Ctrl/Shift 保留已有选择) */
   private updateMarqueeSelection(
     x: number,
     y: number,
@@ -365,17 +382,30 @@ export class CanvasBoard {
     const wx1 = (x + w - this.tx) / this.scale;
     const wy1 = (y + h - this.ty) / this.scale;
     const keep = additive ? new Set(this.selectedIds) : new Set<string>();
+    const keepEl = additive ? new Set(this.selectedElIds) : new Set<string>();
     this.selectedIds = keep;
+    this.selectedElIds = keepEl;
     for (const it of this.store.itemsOnBoard(this.boardId)) {
       const p = it.layouts[this.boardId]!;
-      const ratio = it.w && it.h ? it.h / it.w : 0.75;
       const cw = p.w || DEFAULT_CARD_W;
-      const ch = p.h ?? cw * ratio;
+      // 实际渲染高度优先(音频/链接等 h=null 的旧数据按比例估会偏大,导致下方误选)
+      const dom = this.cardEls.get(it.id);
+      const ratio = it.w && it.h ? it.h / it.w : 0.75;
+      const ch = p.h ?? dom?.offsetHeight ?? cw * ratio;
       const hit = p.x < wx1 && p.x + cw > wx0 && p.y < wy1 && p.y + ch > wy0;
       if (hit) this.selectedIds.add(it.id);
     }
+    for (const el of this.store.boardElements(this.boardId)) {
+      const dom = this.elEls.get(el.id);
+      const ew = el.w || dom?.offsetWidth || 100;
+      const eh = el.kind === "frame" ? el.h : (dom?.offsetHeight ?? 40);
+      const hit = el.x < wx1 && el.x + ew > wx0 && el.y < wy1 && el.y + eh > wy0;
+      if (hit) this.selectedElIds.add(el.id);
+    }
     for (const [id, el] of this.cardEls)
       el.toggleClass("is-selected", this.selectedIds.has(id));
+    for (const [id, el] of this.elEls)
+      el.toggleClass("is-selected", this.selectedElIds.has(id));
   }
 
   private applyTransform(): void {
@@ -392,6 +422,7 @@ export class CanvasBoard {
   private renderAll(): void {
     this.worldEl.empty();
     this.cardEls.clear();
+    this.elEls.clear();
     // 画框元素垫底
     for (const el of this.store.boardElements(this.boardId)) {
       if (el.kind === "frame") this.renderElement(el);
@@ -422,10 +453,14 @@ export class CanvasBoard {
       cls: `ghub-cel ghub-cel-${el.kind}`,
       attr: { "data-id": el.id },
     });
+    this.elEls.set(el.id, node);
+    if (this.selectedElIds.has(el.id)) node.addClass("is-selected");
     node.style.left = `${el.x}px`;
     node.style.top = `${el.y}px`;
     node.style.width = `${el.w}px`;
     if (el.kind === "frame") node.style.height = `${el.h}px`;
+    if (el.kind === "text" && el.fontSize)
+      node.style.setProperty("--cel-fs", `${el.fontSize}px`);
     this.applyElementColor(node, el);
 
     // 可编辑文本(text:正文;frame:左上角标题)
@@ -475,31 +510,73 @@ export class CanvasBoard {
       if (textEl.getAttribute("contenteditable") === "true") e.stopPropagation();
     });
 
-    // 拖拽移动(编辑中除外)
+    // 拖拽移动(编辑中除外;选中集内则群体移动,含卡片)
     let dragging = false;
     let sx = 0;
     let sy = 0;
-    let ox = 0;
-    let oy = 0;
+    let elOrigin: Map<string, { x: number; y: number }> = new Map();
+    let cardOrigin: Map<string, { x: number; y: number }> = new Map();
     node.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       if (node.hasClass("is-editing")) return;
       if ((e.target as HTMLElement).closest(".ghub-cel-resize")) return;
+      // 点击未选中元素:清除框选(Ctrl 加选)
+      if (!this.selectedElIds.has(el.id)) {
+        if (e.ctrlKey || e.metaKey) {
+          this.selectedElIds.add(el.id);
+          node.addClass("is-selected");
+        } else {
+          this.clearSelection();
+        }
+      }
       dragging = true;
       sx = e.clientX;
       sy = e.clientY;
-      ox = el.x;
-      oy = el.y;
+      elOrigin = new Map();
+      cardOrigin = new Map();
+      if (this.selectedElIds.has(el.id)) {
+        // 群体:选中的元素 + 选中的卡片一起动
+        for (const id of this.selectedElIds) {
+          const be = this.store
+            .boardElements(this.boardId)
+            .find((x) => x.id === id);
+          if (be) elOrigin.set(id, { x: be.x, y: be.y });
+        }
+        for (const id of this.selectedIds) {
+          const p = this.store.getItem(id)?.layouts[this.boardId];
+          if (p) cardOrigin.set(id, { x: p.x, y: p.y });
+        }
+      } else {
+        elOrigin.set(el.id, { x: el.x, y: el.y });
+      }
       node.addClass("is-dragging");
       node.setPointerCapture(e.pointerId);
       e.stopPropagation();
     });
     node.addEventListener("pointermove", (e) => {
       if (!dragging) return;
-      el.x = ox + (e.clientX - sx) / this.scale;
-      el.y = oy + (e.clientY - sy) / this.scale;
-      node.style.left = `${el.x}px`;
-      node.style.top = `${el.y}px`;
+      const dx = (e.clientX - sx) / this.scale;
+      const dy = (e.clientY - sy) / this.scale;
+      for (const [id, o] of elOrigin) {
+        const be = this.store
+          .boardElements(this.boardId)
+          .find((x) => x.id === id);
+        const dom = this.elEls.get(id);
+        if (!be || !dom) continue;
+        be.x = o.x + dx;
+        be.y = o.y + dy;
+        dom.style.left = `${be.x}px`;
+        dom.style.top = `${be.y}px`;
+      }
+      for (const [id, o] of cardOrigin) {
+        const p = this.store.getItem(id)?.layouts[this.boardId];
+        const dom = this.cardEls.get(id);
+        if (!p || !dom) continue;
+        p.x = o.x + dx;
+        p.y = o.y + dy;
+        dom.style.left = `${p.x}px`;
+        dom.style.top = `${p.y}px`;
+      }
     });
     const endDrag = (e: PointerEvent) => {
       if (!dragging) return;
@@ -510,12 +587,18 @@ export class CanvasBoard {
       } catch {
         /* ignore */
       }
-      this.store.updateBoardElement(
-        this.boardId,
-        el.id,
-        { x: el.x, y: el.y },
-        true
-      );
+      for (const id of elOrigin.keys()) {
+        const be = this.store
+          .boardElements(this.boardId)
+          .find((x) => x.id === id);
+        if (be)
+          this.store.updateBoardElement(this.boardId, id, { x: be.x, y: be.y }, true);
+      }
+      const cids = [...cardOrigin.keys()];
+      cids.forEach((id, i) => {
+        const p = this.store.getItem(id)?.layouts[this.boardId];
+        if (p) this.store.setLayout(id, this.boardId, { ...p }, i < cids.length - 1 || elOrigin.size > 0);
+      });
     };
     node.addEventListener("pointerup", endDrag);
     node.addEventListener("pointercancel", endDrag);
@@ -564,14 +647,59 @@ export class CanvasBoard {
     node.addEventListener("pointerup", endResize);
     node.addEventListener("pointercancel", endResize);
 
-    // 右键菜单
+    // 右键菜单(选中集内右键 = 作用于整个选中集)
     node.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      const inSelection =
+        this.selectedElIds.has(el.id) && this.selectionSize() > 1;
       const menu = new Menu();
+      if (inSelection) {
+        // 群体操作
+        menu.addItem((mi) =>
+          mi.setTitle(t("colorMenu")).setIcon("palette").onClick(() => {
+            this.showColorPicker(e.clientX, e.clientY, undefined, (color) => {
+              for (const id of this.selectedElIds) {
+                const be = this.store
+                  .boardElements(this.boardId)
+                  .find((x) => x.id === id);
+                if (!be) continue;
+                be.color = color || undefined;
+                this.store.updateBoardElement(this.boardId, id, { color: be.color }, true);
+                const dom = this.elEls.get(id);
+                if (dom) this.applyElementColor(dom, be);
+              }
+            });
+          })
+        );
+        menu.addSeparator();
+        menu.addItem((mi) =>
+          mi
+            .setTitle(t("deleteSelection", { n: this.selectionSize() }))
+            .setIcon("trash-2")
+            .onClick(() => this.deleteSelection())
+        );
+        menu.showAtMouseEvent(e);
+        return;
+      }
       menu.addItem((mi) =>
         mi.setTitle(t("editText")).setIcon("pencil").onClick(() => startEdit())
       );
+      if (el.kind === "text") {
+        // 字号子菜单
+        for (const size of [14, 18, 24, 32, 48, 64]) {
+          menu.addItem((mi) =>
+            mi
+              .setTitle(t("fontSizeN", { n: size }))
+              .setIcon((el.fontSize ?? 18) === size ? "check" : "type")
+              .onClick(() => {
+                el.fontSize = size;
+                this.store.updateBoardElement(this.boardId, el.id, { fontSize: size }, true);
+                node.style.setProperty("--cel-fs", `${size}px`);
+              })
+          );
+        }
+      }
       menu.addItem((mi) =>
         mi.setTitle(t("colorMenu")).setIcon("palette").onClick(() => {
           this.showColorPicker(e.clientX, e.clientY, el.color, (color) => {
@@ -812,11 +940,23 @@ export class CanvasBoard {
       new DetailModal(this.app, this.store, it, this.getTheme()).open();
     });
 
-    // ---- 右键菜单 ----
+    // ---- 右键菜单(在选中集内右键 = 作用于整个选中集) ----
     node.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      const inSelection =
+        this.selectedIds.has(it.id) && this.selectionSize() > 1;
       const menu = new Menu();
+      if (inSelection) {
+        menu.addItem((mi) =>
+          mi
+            .setTitle(t("deleteSelection", { n: this.selectionSize() }))
+            .setIcon("trash-2")
+            .onClick(() => this.deleteSelection())
+        );
+        menu.showAtMouseEvent(e);
+        return;
+      }
       menu.addItem((mi) =>
         mi.setTitle(t("bringToFront")).setIcon("arrow-up-to-line").onClick(() => {
           this.bringToFront(it, node);

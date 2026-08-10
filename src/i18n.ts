@@ -172,6 +172,8 @@ const en = {
   frameDefaultLabel: "Group",
   prevItem: "Previous (←)",
   nextItem: "Next (→)",
+  deleteSelection: "Delete selection ({n})",
+  fontSizeN: "Font size {n}",
 
   // 颜色
   colorDefault: "Default",
@@ -420,6 +422,8 @@ const zh: Record<keyof typeof en, string> = {
   frameDefaultLabel: "分组",
   prevItem: "上一个 (←)",
   nextItem: "下一个 (→)",
+  deleteSelection: "删除选中 ({n})",
+  fontSizeN: "字号 {n}",
 
   colorDefault: "默认",
   colorAmber: "琥珀",

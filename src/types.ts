@@ -106,6 +106,8 @@ export interface BoardElement {
   text: string;
   /** 颜色(色板 key 或 CSS 颜色),空 = 默认(文字随主题/框用琥珀) */
   color?: string;
+  /** 文字元素字号(px),缺省 18 */
+  fontSize?: number;
 }
 
 /** 画布元素预设色板:[色值, 词典 key];"" = 默认色 */

@@ -3,6 +3,9 @@ import { t } from "./i18n";
 import { GalleryStore } from "./store";
 import { GalleryItem } from "./types";
 
+/** AI 参数分区折叠状态:模块级,跨卡片、跨弹窗同步(会话内记忆) */
+let genSectionCollapsed = false;
+
 /** 暗房 Lightbox:左侧大图舞台 + 右侧信息栏;可在序列中左右切换 */
 export class DetailModal extends Modal {
   constructor(
@@ -359,20 +362,41 @@ export class DetailModal extends Modal {
       );
     });
 
-    // ---- 生成参数分区卡片 ----
+    // ---- 生成参数分区卡片(可折叠,状态模块级同步) ----
     const genSec = bar.createDiv({ cls: "ghub-sec" });
-    const genHead = genSec.createDiv({ cls: "ghub-sec-head" });
+    const genHead = genSec.createDiv({
+      cls: "ghub-sec-head",
+      attr: { role: "button", tabindex: "0", "aria-expanded": String(!genSectionCollapsed) },
+    });
     const gicon = genHead.createSpan({ cls: "ghub-sec-icon" });
     setIcon(gicon, "sparkles");
     genHead.createSpan({ text: t("genSection") });
+    const chevron = genHead.createSpan({ cls: "ghub-sec-chevron" });
+    const genBody = genSec.createDiv({ cls: "ghub-sec-body" });
+    const applyCollapsed = () => {
+      setIcon(chevron, genSectionCollapsed ? "chevron-right" : "chevron-down");
+      genBody.toggleClass("is-collapsed", genSectionCollapsed);
+      genHead.setAttribute("aria-expanded", String(!genSectionCollapsed));
+    };
+    const toggleCollapsed = () => {
+      genSectionCollapsed = !genSectionCollapsed;
+      applyCollapsed();
+    };
+    genHead.addEventListener("click", toggleCollapsed);
+    genHead.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleCollapsed();
+      }
+    });
 
-    this.field(genSec, t("promptLabel"), (wrap) => {
+    this.field(genBody, t("promptLabel"), (wrap) => {
       const ta = wrap.createEl("textarea", { attr: { rows: "4" } });
       ta.value = it.gen.prompt;
       ta.addEventListener("input", () => this.patchGen({ prompt: ta.value }));
     }, () => this.item.gen.prompt);
 
-    this.field(genSec, t("negativeLabel"), (wrap) => {
+    this.field(genBody, t("negativeLabel"), (wrap) => {
       const ta = wrap.createEl("textarea", { attr: { rows: "2" } });
       ta.value = it.gen.negativePrompt;
       ta.addEventListener("input", () =>
@@ -381,7 +405,7 @@ export class DetailModal extends Modal {
     }, () => this.item.gen.negativePrompt);
 
     // 模型 / Seed 双列
-    const grid2 = genSec.createDiv({ cls: "ghub-grid2" });
+    const grid2 = genBody.createDiv({ cls: "ghub-grid2" });
     this.field(grid2, t("modelLabel"), (wrap) => {
       const input = wrap.createEl("input", {
         attr: { type: "text", placeholder: t("modelPlaceholder") },
@@ -394,6 +418,7 @@ export class DetailModal extends Modal {
       input.value = it.gen.seed;
       input.addEventListener("input", () => this.patchGen({ seed: input.value }));
     });
+    applyCollapsed();
 
     // ---- 备注 ----
     this.field(bar, t("noteLabel"), (wrap) => {
