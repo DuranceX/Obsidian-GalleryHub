@@ -85,12 +85,67 @@ export class DetailModal extends Modal {
         attr: {
           src: this.app.vault.adapter.getResourcePath(it.path),
           alt: it.title || it.fileName || "图片资产",
+          draggable: "false",
         },
       });
-      // 点击在「适应窗口 ↔ 原始大小」间切换
-      img.addEventListener("click", () => {
-        const zoomed = stage.hasClass("is-zoomed");
-        stage.toggleClass("is-zoomed", !zoomed);
+      // 点击放大(原始尺寸,聚焦到点击处);放大后拖动平移;未拖动的单击还原
+      let dragging = false;
+      let moved = false;
+      let sx = 0;
+      let sy = 0;
+      let sl = 0;
+      let st = 0;
+      img.addEventListener("pointerdown", (e) => {
+        if (!stage.hasClass("is-zoomed") || e.button !== 0) return;
+        dragging = true;
+        moved = false;
+        sx = e.clientX;
+        sy = e.clientY;
+        sl = stage.scrollLeft;
+        st = stage.scrollTop;
+        stage.addClass("is-grabbing");
+        img.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+      img.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - sx;
+        const dy = e.clientY - sy;
+        if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+        stage.scrollLeft = sl - dx;
+        stage.scrollTop = st - dy;
+      });
+      const endDrag = (e: PointerEvent) => {
+        if (!dragging) return;
+        dragging = false;
+        stage.removeClass("is-grabbing");
+        try {
+          img.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+      };
+      img.addEventListener("pointerup", endDrag);
+      img.addEventListener("pointercancel", endDrag);
+      img.addEventListener("click", (e) => {
+        if (stage.hasClass("is-zoomed")) {
+          // 拖动过的松手不算"点击还原"
+          if (moved) {
+            moved = false;
+            return;
+          }
+          stage.removeClass("is-zoomed");
+        } else {
+          // 记录点击在图片上的相对位置,放大后滚动聚焦到该处
+          const rect = img.getBoundingClientRect();
+          const fx = (e.clientX - rect.left) / rect.width;
+          const fy = (e.clientY - rect.top) / rect.height;
+          stage.addClass("is-zoomed");
+          window.requestAnimationFrame(() => {
+            stage.scrollLeft = img.offsetWidth * fx - stage.clientWidth / 2;
+            stage.scrollTop = img.offsetHeight * fy - stage.clientHeight / 2;
+          });
+        }
       });
       if (it.w && it.h) {
         stage.createDiv({
