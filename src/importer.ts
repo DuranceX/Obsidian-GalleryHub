@@ -6,6 +6,7 @@ import {
   newId,
   typeFromExt,
 } from "./types";
+import { t } from "./i18n";
 
 /** 从二进制数据读取图片像素尺寸(失败返回 null,不阻塞导入) */
 async function probeImageSize(
@@ -41,12 +42,12 @@ export class Importer {
         const item = await this.buildItem(file, folder);
         if (item) batch.push(item);
       } catch (e) {
-        new Notice(`导入 ${file.name} 失败:${(e as Error).message}`, 6000);
+        new Notice(t("importFailed", { name: file.name, msg: (e as Error).message }), 6000);
       }
     }
     // 整批一次性入库:单次刷新、单次保存
     this.store.addItems(batch);
-    if (batch.length) new Notice(`已导入 ${batch.length} 个资产`);
+    if (batch.length) new Notice(t("importedN", { n: batch.length }));
     return batch.length;
   }
 
@@ -58,7 +59,7 @@ export class Importer {
     const ext = file.name.split(".").pop() ?? "";
     const type = typeFromExt(ext);
     if (!type) {
-      new Notice(`跳过不支持的格式:${file.name}`);
+      new Notice(t("unsupportedFormat", { name: file.name }));
       return null;
     }
     const id = newId();
@@ -97,14 +98,14 @@ export class Importer {
     const ext = vaultPath.split(".").pop() ?? "";
     const type = typeFromExt(ext);
     if (!type) {
-      new Notice(`不支持的格式:${vaultPath}`);
+      new Notice(t("unsupportedFormatPath", { path: vaultPath }));
       return false;
     }
     const exists = this.store
       .getItems()
       .some((it) => it.path === vaultPath);
     if (exists) {
-      new Notice("该文件已在库中");
+      new Notice(t("alreadyInLibrary"));
       return false;
     }
     const now = new Date().toISOString();
@@ -141,7 +142,7 @@ export class Importer {
 
   addLink(url: string, title: string): boolean {
     if (!/^https?:\/\//i.test(url)) {
-      new Notice("请输入 http(s) 链接");
+      new Notice(t("enterHttpUrl"));
       return false;
     }
     const now = new Date().toISOString();
@@ -188,11 +189,11 @@ export class Importer {
   async createFolderIn(parent: string): Promise<string | null> {
     const ad = this.app.vault.adapter;
     const base = parent ? `${parent}/` : "";
-    let name = "新建文件夹";
+    let name = t("newFolderDefault");
     let rel = `${base}${name}`;
     let i = 2;
     while (await ad.exists(normalizePath(`${ASSETS_DIR}/${rel}`))) {
-      name = `新建文件夹 ${i++}`;
+      name = `${t("newFolderDefault")} ${i++}`;
       rel = `${base}${name}`;
       if (i > 99) return null;
     }
@@ -200,7 +201,7 @@ export class Importer {
       await ad.mkdir(normalizePath(`${ASSETS_DIR}/${rel}`));
       return rel;
     } catch (e) {
-      new Notice(`创建失败:${(e as Error).message}`);
+      new Notice(t("createFailed", { msg: (e as Error).message }));
       return null;
     }
   }
@@ -227,7 +228,7 @@ export class Importer {
 
   private validFolderName(name: string): boolean {
     if (!name || /[\\/:*?"<>|]/.test(name)) {
-      new Notice("文件夹名不能为空或包含 \\ / : * ? \" < > |");
+      new Notice(t("invalidFolderName"));
       return false;
     }
     return true;
@@ -250,7 +251,7 @@ export class Importer {
     if (newRel === rel) return rel;
     // 禁止移动到自己内部
     if (dstParent === rel || dstParent.startsWith(`${rel}/`)) {
-      new Notice("不能把文件夹移动到它自己内部");
+      new Notice(t("folderIntoSelf"));
       return null;
     }
     return this.moveFolderTo(rel, newRel);
@@ -261,17 +262,17 @@ export class Importer {
     const newPath = normalizePath(`${ASSETS_DIR}/${newRel}`);
     const f = this.app.vault.getAbstractFileByPath(oldPath);
     if (!(f instanceof TFolder)) {
-      new Notice(`找不到文件夹:${rel}`);
+      new Notice(t("folderNotFound", { path: rel }));
       return null;
     }
     if (this.app.vault.getAbstractFileByPath(newPath)) {
-      new Notice("目标位置已存在同名文件夹");
+      new Notice(t("folderExists"));
       return null;
     }
     try {
       await this.app.fileManager.renameFile(f as TAbstractFile, newPath);
     } catch (e) {
-      new Notice(`操作失败:${(e as Error).message}`);
+      new Notice(t("operationFailed", { msg: (e as Error).message }));
       return null;
     }
     // 同步库内路径前缀
@@ -294,7 +295,7 @@ export class Importer {
     const path = normalizePath(`${ASSETS_DIR}/${rel}`);
     const f = this.app.vault.getAbstractFileByPath(path);
     if (!(f instanceof TFolder)) {
-      new Notice(`找不到文件夹:${rel}`);
+      new Notice(t("folderNotFound", { path: rel }));
       return null;
     }
     const prefix = `${path}/`;
@@ -305,7 +306,7 @@ export class Importer {
     try {
       await this.app.vault.trash(f, true);
     } catch (e) {
-      new Notice(`删除失败:${(e as Error).message}`);
+      new Notice(t("deleteFailed", { msg: (e as Error).message }));
       return null;
     }
     this.store.deleteItems(doomed);
@@ -341,11 +342,11 @@ export class Importer {
       if (dest === it.path) continue;
       const f = this.app.vault.getAbstractFileByPath(it.path);
       if (!(f instanceof TFile)) {
-        new Notice(`找不到文件:${it.path}`, 5000);
+        new Notice(t("fileNotFound", { path: it.path }), 5000);
         continue;
       }
       if (await ad.exists(dest)) {
-        new Notice(`目标已存在同名文件,跳过:${fileName}`, 5000);
+        new Notice(t("destExists", { name: fileName }), 5000);
         continue;
       }
       try {
@@ -353,10 +354,11 @@ export class Importer {
         this.store.updateItem(it.id, { path: dest });
         moved++;
       } catch (e) {
-        new Notice(`移动 ${fileName} 失败:${(e as Error).message}`, 6000);
+        new Notice(t("moveFailed", { name: fileName, msg: (e as Error).message }), 6000);
       }
     }
-    if (moved) new Notice(`已移动 ${moved} 个资产到「${folder || "根目录"}」`);
+    if (moved)
+      new Notice(t("movedNTo", { n: moved, folder: folder || t("rootDir") }));
     return moved;
   }
 
@@ -372,7 +374,7 @@ export class Importer {
           try {
             await this.app.vault.trash(f, true); // 系统回收站,可恢复
           } catch (e) {
-            new Notice(`删除文件失败:${it.path}(${(e as Error).message})`, 6000);
+            new Notice(t("deleteFileFailed", { path: it.path, msg: (e as Error).message }), 6000);
           }
         }
       }
@@ -380,8 +382,8 @@ export class Importer {
     this.store.deleteItems(items.map((it) => it.id));
     new Notice(
       alsoTrashFiles
-        ? `已删除 ${items.length} 项(文件已移入回收站)`
-        : `已从库中移除 ${items.length} 项(原文件保留)`
+        ? t("deletedNTrash", { n: items.length })
+        : t("removedNKeep", { n: items.length })
     );
   }
 }

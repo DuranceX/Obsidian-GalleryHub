@@ -10,6 +10,7 @@ import { GalleryStore, DB_PATH, setDataRoot } from "./store";
 import { Importer } from "./importer";
 import { GalleryView, VIEW_TYPE_GALLERY } from "./view";
 import { GalleryHubSettings, DEFAULT_SETTINGS } from "./types";
+import { t, setLocale, detectObsidianLocale } from "./i18n";
 
 export default class GalleryHubPlugin extends Plugin {
   store!: GalleryStore;
@@ -18,6 +19,7 @@ export default class GalleryHubPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    this.applyLocale();
     setDataRoot(this.settings.dataFolder);
     this.store = new GalleryStore(this.app);
     this.importer = new Importer(this.app, this.store);
@@ -39,25 +41,25 @@ export default class GalleryHubPlugin extends Plugin {
 
     this.addSettingTab(new GalleryHubSettingTab(this.app, this));
 
-    this.addRibbonIcon("images", "打开 GalleryHub", () => {
+    this.addRibbonIcon("images", t("openGalleryHub"), () => {
       void this.activateView();
     });
 
     this.addCommand({
       id: "open-gallery",
-      name: "打开画廊",
+      name: t("cmdOpenGallery"),
       callback: () => void this.activateView(),
     });
 
     this.addCommand({
       id: "register-current-file",
-      name: "将当前文件登记到画廊",
+      name: t("cmdRegisterCurrentFile"),
       checkCallback: (checking) => {
         const f = this.app.workspace.getActiveFile();
         if (!f) return false;
         if (checking) return true;
         void this.importer.registerVaultFile(f.path).then((ok) => {
-          if (ok) new Notice(`已登记:${f.name}`);
+          if (ok) new Notice(t("registered", { name: f.name }));
         });
         return true;
       },
@@ -72,7 +74,7 @@ export default class GalleryHubPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
         if (file.path === DB_PATH && !this.store.isSelfWriting()) {
-          new Notice("GalleryHub:数据文件被外部修改,已重新加载。");
+          new Notice(t("dbExternallyModified"));
           void this.store.load();
         }
       })
@@ -88,6 +90,21 @@ export default class GalleryHubPlugin extends Plugin {
 
   async onunload(): Promise<void> {
     await this.store.flush();
+  }
+
+  // ---------- 语言 ----------
+
+  applyLocale(): void {
+    const lang = this.settings.language;
+    setLocale(lang === "auto" ? detectObsidianLocale() : lang);
+  }
+
+  /** 语言变更后重建所有已打开的画廊视图(文案在 DOM 构建时固化,需整体重渲染) */
+  rebuildViews(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GALLERY)) {
+      const view = leaf.view;
+      if (view instanceof GalleryView) void view.onOpen();
+    }
   }
 
   // ---------- 主题 ----------
@@ -153,13 +170,31 @@ class GalleryHubSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName("颜色模式")
-      .setDesc("画廊界面的配色。「跟随 Obsidian」会随应用的明暗主题自动切换。")
+      .setName(t("settingLanguage"))
+      .setDesc(t("settingLanguageDesc"))
       .addDropdown((d) =>
         d
-          .addOption("dark", "暗色")
-          .addOption("light", "浅色")
-          .addOption("follow", "跟随 Obsidian")
+          .addOption("auto", t("langAuto"))
+          .addOption("zh", t("langZh"))
+          .addOption("en", t("langEn"))
+          .setValue(this.plugin.settings.language)
+          .onChange(async (v) => {
+            this.plugin.settings.language = v as GalleryHubSettings["language"];
+            await this.plugin.saveSettings();
+            this.plugin.applyLocale();
+            this.plugin.rebuildViews();
+            this.display(); // 设置页自身也切语言
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t("settingColorMode"))
+      .setDesc(t("settingColorModeDesc"))
+      .addDropdown((d) =>
+        d
+          .addOption("dark", t("colorDark"))
+          .addOption("light", t("colorLight"))
+          .addOption("follow", t("colorFollow"))
           .setValue(this.plugin.settings.colorMode)
           .onChange(async (v) => {
             this.plugin.settings.colorMode = v as GalleryHubSettings["colorMode"];
@@ -169,12 +204,10 @@ class GalleryHubSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("数据文件夹")
-      .setDesc(
-        "gallery.json 与 assets/ 的存放位置(仓库相对路径,可多级如「xxx/yyy」)。修改后在新位置初始化;旧数据不会自动迁移,如需保留请手动移动文件夹后再修改此项。"
-      )
-      .addText((t) =>
-        t
+      .setName(t("settingDataFolder"))
+      .setDesc(t("settingDataFolderDesc"))
+      .addText((txt) =>
+        txt
           .setPlaceholder("GalleryHub")
           .setValue(this.plugin.settings.dataFolder)
           .onChange(async (v) => {
@@ -187,7 +220,7 @@ class GalleryHubSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(containerEl).setName("侧边栏模块").setHeading();
+    new Setting(containerEl).setName(t("settingSidebarModules")).setHeading();
 
     const moduleToggle = (
       name: string,
@@ -197,25 +230,25 @@ class GalleryHubSettingTab extends PluginSettingTab {
       new Setting(containerEl)
         .setName(name)
         .setDesc(desc)
-        .addToggle((t) =>
-          t.setValue(this.plugin.settings[key]).onChange(async (v) => {
+        .addToggle((tg) =>
+          tg.setValue(this.plugin.settings[key]).onChange(async (v) => {
             this.plugin.settings[key] = v;
             await this.plugin.saveSettings();
             this.plugin.refreshViews();
           })
         );
     };
-    moduleToggle("文件树", "assets 目录树(含新建/重命名/拖拽)", "showFolders");
-    moduleToggle("画布", "画布列表(点击直接打开)", "showBoards");
-    moduleToggle("类型", "全部/图片/视频/链接 筛选", "showTypes");
-    moduleToggle("评分", "按星级筛选", "showRatings");
-    moduleToggle("标签", "标签云筛选", "showTags");
+    moduleToggle(t("settingModFolders"), t("settingModFoldersDesc"), "showFolders");
+    moduleToggle(t("settingModBoards"), t("settingModBoardsDesc"), "showBoards");
+    moduleToggle(t("settingModTypes"), t("settingModTypesDesc"), "showTypes");
+    moduleToggle(t("settingModRatings"), t("settingModRatingsDesc"), "showRatings");
+    moduleToggle(t("settingModTags"), t("settingModTagsDesc"), "showTags");
 
     new Setting(containerEl)
-      .setName("删除文件时跳过确认")
-      .setDesc("物理删除(移入回收站)不再弹出二次确认。")
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.skipDeleteConfirm).onChange(async (v) => {
+      .setName(t("settingSkipDeleteConfirm"))
+      .setDesc(t("settingSkipDeleteConfirmDesc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.skipDeleteConfirm).onChange(async (v) => {
           this.plugin.settings.skipDeleteConfirm = v;
           await this.plugin.saveSettings();
         })

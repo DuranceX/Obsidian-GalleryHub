@@ -15,6 +15,8 @@ export type SortMode =
 
 export interface GalleryHubSettings {
   colorMode: ColorMode;
+  /** 界面语言:auto = 跟随 Obsidian */
+  language: "auto" | "zh" | "en";
   /** 数据文件夹(仓库相对路径):在此目录下初始化 gallery.json 与 assets/,默认 "GalleryHub" */
   dataFolder: string;
   /** 侧边栏模块开关 */
@@ -29,6 +31,7 @@ export interface GalleryHubSettings {
 
 export const DEFAULT_SETTINGS: GalleryHubSettings = {
   colorMode: "dark",
+  language: "auto",
   dataFolder: "GalleryHub",
   showFolders: true,
   showBoards: true,
@@ -105,17 +108,27 @@ export interface BoardElement {
   color?: string;
 }
 
-/** 画布元素预设色板 */
-export const ELEMENT_COLORS: Array<[string, string]> = [
-  ["", "默认"],
-  ["#e8b04b", "琥珀"],
-  ["#e06c5b", "绯红"],
-  ["#6fbf73", "松绿"],
-  ["#5b9dd9", "湖蓝"],
-  ["#a06cd5", "紫藤"],
-  ["#d95b9a", "桃粉"],
-  ["#9a9791", "石灰"],
+/** 画布元素预设色板:[色值, 词典 key];"" = 默认色 */
+export const ELEMENT_COLORS: Array<[string, ColorNameKey]> = [
+  ["", "colorDefault"],
+  ["#e8b04b", "colorAmber"],
+  ["#e06c5b", "colorCrimson"],
+  ["#6fbf73", "colorPine"],
+  ["#5b9dd9", "colorLake"],
+  ["#a06cd5", "colorWisteria"],
+  ["#d95b9a", "colorPeach"],
+  ["#9a9791", "colorAsh"],
 ];
+
+export type ColorNameKey =
+  | "colorDefault"
+  | "colorAmber"
+  | "colorCrimson"
+  | "colorPine"
+  | "colorLake"
+  | "colorWisteria"
+  | "colorPeach"
+  | "colorAsh";
 
 export interface GalleryData {
   version: number;
@@ -139,11 +152,13 @@ export function emptyGen(): GenMeta {
   };
 }
 
+import { t } from "./i18n";
+
 export function emptyData(): GalleryData {
   return {
     version: SCHEMA_VERSION,
     boards: {
-      "b-default": { name: "默认画布", createdAt: new Date().toISOString() },
+      "b-default": { name: t("defaultBoard"), createdAt: new Date().toISOString() },
     },
     items: [],
   };

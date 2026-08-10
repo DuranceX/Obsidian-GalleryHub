@@ -3,6 +3,7 @@ import { GalleryStore } from "./store";
 import { Importer } from "./importer";
 import { GalleryItem, ItemType, SortMode, GalleryHubSettings } from "./types";
 import { CanvasBoard } from "./canvas";
+import { t } from "./i18n";
 import {
   DetailModal,
   AddLinkModal,
@@ -31,13 +32,15 @@ interface TreeNode {
   children: TreeNode[];
 }
 
-const SORT_OPTIONS: Array<[SortMode, string]> = [
-  ["created-desc", "最新导入"],
-  ["created-asc", "最早导入"],
-  ["title-asc", "标题 A→Z"],
-  ["rating-desc", "评分从高到低"],
-  ["type", "按类型"],
-];
+function sortOptions(): Array<[SortMode, string]> {
+  return [
+    ["created-desc", t("sortCreatedDesc")],
+    ["created-asc", t("sortCreatedAsc")],
+    ["title-asc", t("sortTitleAsc")],
+    ["rating-desc", t("sortRatingDesc")],
+    ["type", t("sortByType")],
+  ];
+}
 
 export class GalleryView extends ItemView {
   private store: GalleryStore;
@@ -216,12 +219,12 @@ export class GalleryView extends ItemView {
     const modeWrap = bar.createDiv({ cls: "ghub-mode" });
     const gridBtn = modeWrap.createEl("button", {
       cls: "ghub-mode-btn is-active",
-      attr: { "aria-label": "画廊模式", title: "画廊" },
+      attr: { "aria-label": t("galleryMode"), title: t("galleryMode") },
     });
     setIcon(gridBtn, "gallery-thumbnails");
     const canvasBtn = modeWrap.createEl("button", {
       cls: "ghub-mode-btn",
-      attr: { "aria-label": "画布模式", title: "画布" },
+      attr: { "aria-label": t("canvasMode"), title: t("canvasMode") },
     });
     setIcon(canvasBtn, "frame");
     gridBtn.addEventListener("click", () => this.setMode("grid"));
@@ -231,7 +234,7 @@ export class GalleryView extends ItemView {
     // 画布选择器(画布模式可见):按钮 + Menu,与工具栏样式统一
     this.boardBtnEl = bar.createEl("button", {
       cls: "ghub-board-btn",
-      attr: { "aria-label": "切换画布" },
+      attr: { "aria-label": t("switchBoard") },
     });
     this.boardBtnEl.addEventListener("click", (e) => {
       const menu = new Menu();
@@ -246,21 +249,21 @@ export class GalleryView extends ItemView {
       }
       menu.addSeparator();
       menu.addItem((mi) =>
-        mi.setTitle("新建画布").setIcon("plus").onClick(() => {
+        mi.setTitle(t("newBoard")).setIcon("plus").onClick(() => {
           const id = this.store.createBoard(
-            `画布 ${Object.keys(this.store.getBoards()).length + 1}`
+            t("boardNumbered", { n: Object.keys(this.store.getBoards()).length + 1 })
           );
           if (id) this.openBoard(id);
         })
       );
       menu.addItem((mi) =>
-        mi.setTitle("重命名当前画布").setIcon("pencil").onClick(() => {
+        mi.setTitle(t("renameBoard")).setIcon("pencil").onClick(() => {
           this.renameActiveBoard();
         })
       );
       if (Object.keys(boards).length > 1) {
         menu.addItem((mi) =>
-          mi.setTitle("删除当前画布").setIcon("trash-2").onClick(() => {
+          mi.setTitle(t("deleteBoard")).setIcon("trash-2").onClick(() => {
             this.deleteActiveBoard();
           })
         );
@@ -270,7 +273,7 @@ export class GalleryView extends ItemView {
 
     const search = bar.createEl("input", {
       cls: "ghub-search",
-      attr: { type: "search", placeholder: "搜索标题 / prompt / 备注…" },
+      attr: { type: "search", placeholder: t("searchPlaceholder") },
     });
     search.addEventListener("input", () => {
       this.filter.search = search.value.toLowerCase();
@@ -283,11 +286,11 @@ export class GalleryView extends ItemView {
     // 排序方式(按钮 + Menu,与画布切换器统一样式)
     this.sortBtnEl = bar.createEl("button", {
       cls: "ghub-board-btn",
-      attr: { "aria-label": "排序方式" },
+      attr: { "aria-label": t("sortBy") },
     });
     this.sortBtnEl.addEventListener("click", (e) => {
       const menu = new Menu();
-      for (const [val, label] of SORT_OPTIONS) {
+      for (const [val, label] of sortOptions()) {
         menu.addItem((mi) =>
           mi
             .setTitle(label)
@@ -306,18 +309,18 @@ export class GalleryView extends ItemView {
     bar.createDiv({ cls: "ghub-spacer" });
 
     const importBtn = bar.createEl("button", {
-      text: "＋ 导入文件",
-      attr: { "aria-label": "从系统选择图片或视频导入" },
+      text: t("importFiles"),
+      attr: { "aria-label": t("importFilesAria") },
     });
     importBtn.addEventListener("click", () => this.pickFiles());
 
     const linkBtn = bar.createEl("button", {
-      text: "＋ 链接",
-      attr: { "aria-label": "添加外部链接" },
+      text: t("addLink"),
+      attr: { "aria-label": t("addLinkAria") },
     });
     linkBtn.addEventListener("click", () => {
       new AddLinkModal(this.app, this.getTheme(), (url, title) => {
-        if (this.importer.addLink(url, title)) new Notice("链接已添加");
+        if (this.importer.addLink(url, title)) new Notice(t("linkAdded"));
       }).open();
     });
 
@@ -332,7 +335,7 @@ export class GalleryView extends ItemView {
     const ic = btn.createSpan({ cls: "ghub-board-btn-ic" });
     setIcon(ic, "arrow-up-down");
     const label =
-      SORT_OPTIONS.find(([v]) => v === this.sortMode)?.[1] ?? "排序";
+      sortOptions().find(([v]) => v === this.sortMode)?.[1] ?? t("sortBy");
     btn.createSpan({ text: label, cls: "ghub-board-btn-t" });
     const chev = btn.createSpan({ cls: "ghub-board-btn-ic" });
     setIcon(chev, "chevron-down");
@@ -361,7 +364,7 @@ export class GalleryView extends ItemView {
       // 默认进入第一个画布
       if (!this.activeBoardId) {
         const ids = Object.keys(this.store.getBoards());
-        this.activeBoardId = ids[0] ?? this.store.createBoard("默认画布");
+        this.activeBoardId = ids[0] ?? this.store.createBoard(t("defaultBoard"));
       }
       this.openBoard(this.activeBoardId!);
     } else {
@@ -391,8 +394,8 @@ export class GalleryView extends ItemView {
     const ic = btn.createSpan({ cls: "ghub-board-btn-ic" });
     setIcon(ic, "frame");
     const name = this.activeBoardId
-      ? this.store.getBoards()[this.activeBoardId]?.name ?? "画布"
-      : "画布";
+      ? this.store.getBoards()[this.activeBoardId]?.name ?? t("canvasMode")
+      : t("canvasMode");
     btn.createSpan({ text: name, cls: "ghub-board-btn-t" });
     const chev = btn.createSpan({ cls: "ghub-board-btn-ic" });
     setIcon(chev, "chevron-down");
@@ -412,14 +415,14 @@ export class GalleryView extends ItemView {
     this.refreshBoardSelect();
     this.renderSidebar(); // 更新侧边栏画布模块的选中态
     this.countEl.setText(
-      `${this.store.itemsOnBoard(id).length} 项在画布上`
+      t("itemsOnBoard", { n: this.store.itemsOnBoard(id).length })
     );
   }
 
   private renameActiveBoard(): void {
     if (!this.activeBoardId) return;
     const cur = this.store.getBoards()[this.activeBoardId];
-    const name = window.prompt("画布名称", cur?.name ?? "");
+    const name = window.prompt(t("boardNamePrompt"), cur?.name ?? "");
     if (name?.trim()) this.store.renameBoard(this.activeBoardId, name);
     this.refreshBoardSelect();
   }
@@ -438,8 +441,8 @@ export class GalleryView extends ItemView {
         const next = Object.keys(this.store.getBoards())[0];
         this.openBoard(next);
       },
-      `删除画布「${cur?.name}」?`,
-      "只删除画布与卡片布局,资产本身保留在库中。"
+      t("deleteBoardTitle", { name: cur?.name ?? "" }),
+      t("deleteBoardDesc")
     ).open();
   }
 
@@ -492,20 +495,20 @@ export class GalleryView extends ItemView {
     bar.toggleClass("is-visible", n > 0);
     if (!n) return;
 
-    bar.createSpan({ cls: "ghub-batch-count", text: `已选 ${n} 项` });
+    bar.createSpan({ cls: "ghub-batch-count", text: t("selectedCount", { n }) });
 
-    const selAll = bar.createEl("button", { text: "全选当前" });
+    const selAll = bar.createEl("button", { text: t("selectAllCurrent") });
     selAll.addEventListener("click", () => {
       for (const it of this.filtered()) this.selected.add(it.id);
       this.renderGrid();
       this.renderBatchBar();
     });
 
-    const move = bar.createEl("button", { text: "移动到…" });
+    const move = bar.createEl("button", { text: t("moveTo") });
     move.addEventListener("click", () => {
       const items = this.selectedItems().filter((it) => it.path);
       if (!items.length) {
-        new Notice("选中项中没有可移动的文件(链接不占文件)");
+        new Notice(t("noMovableInSelection"));
         return;
       }
       void this.importer.listFolders().then((folders) => {
@@ -513,7 +516,7 @@ export class GalleryView extends ItemView {
           this.app,
           this.getTheme(),
           folders,
-          `移动 ${items.length} 个资产到…`,
+          t("moveNTo", { n: items.length }),
           (folder) => {
             void (async () => {
               if (!(await this.importer.createFolderIfMissing(folder))) return;
@@ -527,7 +530,7 @@ export class GalleryView extends ItemView {
     });
 
     // 批量编辑(标签/星级)
-    const edit = bar.createEl("button", { text: "编辑…" });
+    const edit = bar.createEl("button", { text: t("batchEdit") });
     edit.addEventListener("click", () => {
       const items = this.selectedItems();
       if (!items.length) return;
@@ -535,12 +538,12 @@ export class GalleryView extends ItemView {
     });
 
     // 发送到画布
-    const toBoard = bar.createEl("button", { text: "发送到画布" });
+    const toBoard = bar.createEl("button", { text: t("sendToBoard") });
     toBoard.addEventListener("click", (e) => {
       this.sendToBoard(this.selectedItems(), e as MouseEvent);
     });
 
-    const del = bar.createEl("button", { text: "删除…", cls: "ghub-danger" });
+    const del = bar.createEl("button", { text: t("deleteBtn"), cls: "ghub-danger" });
     del.addEventListener("click", () => {
       const items = this.selectedItems();
       new ConfirmDeleteModal(
@@ -558,7 +561,7 @@ export class GalleryView extends ItemView {
 
     bar.createDiv({ cls: "ghub-spacer" });
 
-    const clear = bar.createEl("button", { text: "取消选择 (Esc)" });
+    const clear = bar.createEl("button", { text: t("clearSelection") });
     clear.addEventListener("click", () => this.clearSelection());
   }
 
@@ -573,10 +576,10 @@ export class GalleryView extends ItemView {
     // 文件夹树(assets/ 目录树 ↔ Hub)
     if (cfg.showFolders) {
       const head = side.createDiv({ cls: "ghub-side-head" });
-      head.createEl("h3", { text: "文件夹" });
+      head.createEl("h3", { text: t("folders") });
       const addBtn = head.createEl("button", {
         cls: "ghub-mini-btn",
-        attr: { "aria-label": "在根目录新建文件夹" },
+        attr: { "aria-label": t("newFolderInRoot") },
       });
       setIcon(addBtn, "folder-plus");
       addBtn.addEventListener("click", () => void this.quickCreateFolder(""));
@@ -585,7 +588,7 @@ export class GalleryView extends ItemView {
       const allRow = this.fitem(
         side,
         "layers",
-        "全部",
+        t("all"),
         all.length,
         this.filter.folder === null,
         () => {
@@ -604,15 +607,15 @@ export class GalleryView extends ItemView {
     // 画布(在文件夹与类型之间)
     if (cfg.showBoards) {
       const bhead = side.createDiv({ cls: "ghub-side-head" });
-      bhead.createEl("h3", { text: "画布" });
+      bhead.createEl("h3", { text: t("boards") });
       const baddBtn = bhead.createEl("button", {
         cls: "ghub-mini-btn",
-        attr: { "aria-label": "新建画布" },
+        attr: { "aria-label": t("newBoard") },
       });
       setIcon(baddBtn, "plus");
       baddBtn.addEventListener("click", () => {
         const id = this.store.createBoard(
-          `画布 ${Object.keys(this.store.getBoards()).length + 1}`
+          t("boardNumbered", { n: Object.keys(this.store.getBoards()).length + 1 })
         );
         if (id) this.openBoardFromSidebar(id);
       });
@@ -630,13 +633,13 @@ export class GalleryView extends ItemView {
 
     // 类型
     if (cfg.showTypes) {
-      side.createEl("h3", { text: "类型" });
+      side.createEl("h3", { text: t("types") });
       const typeDefs: Array<[ItemType | "all", string, string, number]> = [
-        ["all", "layers", "全部资产", all.length],
-        ["image", "image", "图片", all.filter((i) => i.type === "image").length],
-        ["video", "film", "视频", all.filter((i) => i.type === "video").length],
-        ["audio", "music", "音频", all.filter((i) => i.type === "audio").length],
-        ["link", "link", "链接", all.filter((i) => i.type === "link").length],
+        ["all", "layers", t("allAssets"), all.length],
+        ["image", "image", t("image"), all.filter((i) => i.type === "image").length],
+        ["video", "film", t("video"), all.filter((i) => i.type === "video").length],
+        ["audio", "music", t("audio"), all.filter((i) => i.type === "audio").length],
+        ["link", "link", t("link"), all.filter((i) => i.type === "link").length],
       ];
       for (const [val, icon, label, n] of typeDefs) {
         this.fitem(side, icon, label, n, this.filter.type === val, () => {
@@ -648,11 +651,11 @@ export class GalleryView extends ItemView {
 
     // 评分(多选:点亮任意组合,全部=清空)
     if (cfg.showRatings) {
-      side.createEl("h3", { text: "评分" });
+      side.createEl("h3", { text: t("ratings") });
       this.fitem(
         side,
         null,
-        "全部评分",
+        t("allRatings"),
         all.length,
         this.filter.ratings.size === 0,
         () => {
@@ -679,12 +682,12 @@ export class GalleryView extends ItemView {
 
     // 标签云
     if (cfg.showTags) {
-      side.createEl("h3", { text: "标签" });
+      side.createEl("h3", { text: t("tags") });
       const counts = new Map<string, number>();
       for (const it of all)
         for (const t of it.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
       if (!counts.size) {
-        side.createDiv({ cls: "ghub-side-empty", text: "暂无标签" });
+        side.createDiv({ cls: "ghub-side-empty", text: t("noTags") });
         return;
       }
       const cloud = side.createDiv({ cls: "ghub-tagcloud" });
@@ -704,7 +707,7 @@ export class GalleryView extends ItemView {
       }
       if (this.filter.tags.size) {
         const clear = cloud.createEl("span", {
-          text: "✕ 清除",
+          text: t("clearTags"),
           cls: "ghub-tag",
         });
         clear.addEventListener("click", () => {
@@ -893,13 +896,13 @@ export class GalleryView extends ItemView {
       const menu = new Menu();
       menu.addItem((mi) =>
         mi
-          .setTitle("新建子文件夹")
+          .setTitle(t("newSubfolder"))
           .setIcon("folder-plus")
           .onClick(() => void this.quickCreateFolder(node.rel))
       );
       menu.addItem((mi) =>
         mi
-          .setTitle("重命名")
+          .setTitle(t("rename"))
           .setIcon("pencil")
           .onClick(() => {
             this.renaming = node.rel;
@@ -909,7 +912,7 @@ export class GalleryView extends ItemView {
       menu.addSeparator();
       menu.addItem((mi) =>
         mi
-          .setTitle("删除(文件进回收站)")
+          .setTitle(t("deleteFolderMenu"))
           .setIcon("trash-2")
           .onClick(() => {
             const n = this.countInFolder(node.rel);
@@ -928,8 +931,8 @@ export class GalleryView extends ItemView {
                   void this.refreshFolders().then(() => this.renderGrid());
                 });
               },
-              `删除文件夹「${node.name}」?`,
-              `将删除该文件夹及其中 ${n} 个已入库资产(文件进系统回收站)。`
+              t("deleteFolderTitle", { name: node.name }),
+              t("deleteFolderDesc", { n })
             ).open();
           })
       );
@@ -1062,14 +1065,14 @@ export class GalleryView extends ItemView {
     if (this.mode === "canvas") {
       if (this.activeBoardId)
         this.countEl.setText(
-          `${this.store.itemsOnBoard(this.activeBoardId).length} 项在画布上`
+          t("itemsOnBoard", { n: this.store.itemsOnBoard(this.activeBoardId).length })
         );
       return;
     }
     const items = this.filtered();
     this.countEl.setText(
-      `${items.length} / ${this.store.getItems().length} 项` +
-        (this.store.readOnly ? " · 只读模式" : "")
+      t("itemCount", { shown: items.length, total: this.store.getItems().length }) +
+        (this.store.readOnly ? t("readOnlySuffix") : "")
     );
     this.gridEl.empty();
 
@@ -1078,19 +1081,19 @@ export class GalleryView extends ItemView {
       if (this.store.getItems().length === 0) {
         const ic = empty.createDiv({ cls: "ghub-empty-icon" });
         setIcon(ic, "image-plus");
-        empty.createDiv({ text: "库是空的" });
+        empty.createDiv({ text: t("emptyLibrary") });
         empty.createDiv({
           cls: "ghub-empty-hint",
-          text: "点击右上角「＋ 导入文件」,或直接把图片/视频拖进本窗口",
+          text: t("emptyLibraryHint"),
         });
         const btn = empty.createEl("button", {
-          text: "导入第一批资产",
+          text: t("importFirstBatch"),
           cls: "mod-cta",
         });
         btn.addEventListener("click", () => this.pickFiles());
       } else {
-        empty.createDiv({ text: "没有符合筛选条件的资产" });
-        const btn = empty.createEl("button", { text: "清除全部筛选" });
+        empty.createDiv({ text: t("noFilterResults") });
+        const btn = empty.createEl("button", { text: t("clearAllFilters") });
         btn.addEventListener("click", () => {
           this.filter = {
             search: "",
@@ -1191,7 +1194,7 @@ export class GalleryView extends ItemView {
     }
     if (it.type === "image" && it.path) {
       const img = thumb.createEl("img", {
-        attr: { loading: "lazy", alt: it.title || it.fileName || "图片资产" },
+        attr: { loading: "lazy", alt: it.title || it.fileName || t("image") },
       });
       if (it.w && it.h) {
         img.width = it.w;
@@ -1218,7 +1221,7 @@ export class GalleryView extends ItemView {
       const ic = head.createDiv({ cls: "ghub-audiobox-icon" });
       setIcon(ic, "music");
       const tw = head.createDiv({ cls: "ghub-audiobox-titles" });
-      tw.createDiv({ cls: "ghub-audiobox-title", text: it.title || "(无标题)" });
+      tw.createDiv({ cls: "ghub-audiobox-title", text: it.title || t("noTitle") });
       if (it.fileName && it.fileName !== it.title)
         tw.createDiv({ cls: "ghub-linkbox-domain", text: it.fileName });
       const audio = box.createEl("audio", {
@@ -1234,7 +1237,7 @@ export class GalleryView extends ItemView {
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
       setIcon(ic, "link");
       const tw = box.createDiv({ cls: "ghub-audiobox-titles" });
-      tw.createDiv({ cls: "ghub-audiobox-title", text: it.title || "(无标题)" });
+      tw.createDiv({ cls: "ghub-audiobox-title", text: it.title || t("noTitle") });
       try {
         tw.createDiv({
           cls: "ghub-linkbox-domain",
@@ -1252,7 +1255,7 @@ export class GalleryView extends ItemView {
       if (it.gen.prompt) top.createSpan({ cls: "ghub-chip-p", text: "PROMPT" });
       if (it.type === "video") top.createSpan({ cls: "ghub-chip-v", text: "▶ VIDEO" });
       const bottom = veil.createDiv({ cls: "ghub-veil-bottom" });
-      bottom.createDiv({ cls: "ghub-vtitle", text: it.title || "(无标题)" });
+      bottom.createDiv({ cls: "ghub-vtitle", text: it.title || t("noTitle") });
       const meta = bottom.createDiv({ cls: "ghub-veil-meta" });
       if (it.rating > 0)
         meta.createSpan({ text: "★".repeat(it.rating), cls: "ghub-stars" });
@@ -1263,7 +1266,7 @@ export class GalleryView extends ItemView {
     // 选择圆钮:悬停或已选中时可见;点击只切换选择,不打开详情
     const check = card.createDiv({
       cls: "ghub-check",
-      attr: { role: "checkbox", "aria-label": "选择", tabindex: "-1" },
+      attr: { role: "checkbox", "aria-label": t("selectAria"), tabindex: "-1" },
     });
     setIcon(check, "check");
     check.addEventListener("click", (e) => {
@@ -1303,47 +1306,47 @@ export class GalleryView extends ItemView {
         ? this.selectedItems()
         : [it];
       const many = targets.length > 1;
-      const label = many ? `${targets.length} 项` : "";
+      const label = many ? t("nItems", { n: targets.length }) : "";
       const menu = new Menu();
       if (!many) {
         menu.addItem((mi) =>
-          mi.setTitle("编辑详情").setIcon("pencil").onClick(() => this.openDetail(it))
+          mi.setTitle(t("editDetail")).setIcon("pencil").onClick(() => this.openDetail(it))
         );
       } else {
         menu.addItem((mi) =>
-          mi.setTitle(`批量编辑 ${label}…`).setIcon("pencil").onClick(() => {
+          mi.setTitle(t("batchEditN", { label })).setIcon("pencil").onClick(() => {
             new BatchEditModal(this.app, this.getTheme(), targets, this.store).open();
           })
         );
       }
       menu.addItem((mi) =>
-        mi.setTitle(`发送到画布${label ? ` (${label})` : ""}`).setIcon("frame").onClick(() => {
+        mi.setTitle(t("sendToBoardN", { label: label ? ` (${label})` : "" })).setIcon("frame").onClick(() => {
           this.sendToBoard(targets);
         })
       );
       const movable = targets.filter((t) => t.path);
       if (movable.length) {
         menu.addItem((mi) =>
-          mi.setTitle(`移动到…${label ? ` (${label})` : ""}`).setIcon("folder-input").onClick(() => {
+          mi.setTitle(t("moveToN", { label: label ? ` (${label})` : "" })).setIcon("folder-input").onClick(() => {
             void this.moveItemsViaPicker(movable);
           })
         );
       }
       if (!many && (it.path || it.originPath)) {
         menu.addItem((mi) =>
-          mi.setTitle("打开源文件位置").setIcon("folder-open").onClick(() => {
+          mi.setTitle(t("openOrigin")).setIcon("folder-open").onClick(() => {
             this.revealOrigin(it);
           })
         );
       }
       menu.addSeparator();
       menu.addItem((mi) =>
-        mi.setTitle(`从库中移除${label ? ` (${label})` : ""}`).setIcon("x").onClick(() => {
+        mi.setTitle(t("removeFromLibraryN", { label: label ? ` (${label})` : "" })).setIcon("x").onClick(() => {
           void this.importer.deleteItems(targets, false).then(() => this.clearSelection());
         })
       );
       menu.addItem((mi) =>
-        mi.setTitle(`删除文件${label ? ` (${label})` : ""}`).setIcon("trash-2").onClick(() => {
+        mi.setTitle(t("deleteFilesN", { label: label ? ` (${label})` : "" })).setIcon("trash-2").onClick(() => {
           this.deleteWithConfirm(targets);
         })
       );
@@ -1367,7 +1370,7 @@ export class GalleryView extends ItemView {
         const { shell } = require("electron");
         void shell.showItemInFolder(origin);
       } catch {
-        new Notice("无法打开该路径");
+        new Notice(t("cannotOpenPath"));
       }
       return;
     }
@@ -1379,9 +1382,9 @@ export class GalleryView extends ItemView {
         const adapter = this.app.vault.adapter as { getFullPath?: (p: string) => string };
         const full = adapter.getFullPath?.(it.path);
         if (full) void shell.showItemInFolder(full);
-        else new Notice("无法定位文件");
+        else new Notice(t("cannotLocateFile"));
       } catch {
-        new Notice("无法打开文件位置");
+        new Notice(t("cannotOpenLocation"));
       }
     }
   }
@@ -1403,7 +1406,7 @@ export class GalleryView extends ItemView {
     const boards = Object.entries(this.store.getBoards());
     // 单画布(或无画布)直接发,不打扰
     if (boards.length <= 1) {
-      const boardId = boards[0]?.[0] ?? this.store.createBoard("默认画布");
+      const boardId = boards[0]?.[0] ?? this.store.createBoard(t("defaultBoard"));
       if (boardId) this.doSendToBoard(items, boardId);
       return;
     }
@@ -1411,15 +1414,15 @@ export class GalleryView extends ItemView {
     for (const [id, meta] of boards) {
       menu.addItem((mi) =>
         mi
-          .setTitle(meta.name + (id === this.activeBoardId ? "(当前)" : ""))
+          .setTitle(meta.name + (id === this.activeBoardId ? t("currentSuffix") : ""))
           .setIcon("frame")
           .onClick(() => this.doSendToBoard(items, id))
       );
     }
     menu.addSeparator();
     menu.addItem((mi) =>
-      mi.setTitle("新建画布并发送").setIcon("plus").onClick(() => {
-        const id = this.store.createBoard(`画布 ${boards.length + 1}`);
+      mi.setTitle(t("newBoardAndSend")).setIcon("plus").onClick(() => {
+        const id = this.store.createBoard(t("boardNumbered", { n: boards.length + 1 }));
         if (id) this.doSendToBoard(items, id);
       })
     );
@@ -1434,8 +1437,8 @@ export class GalleryView extends ItemView {
     const added = this.canvas?.addItems(items) ?? 0;
     new Notice(
       added
-        ? `已放入 ${added} 项到「${this.store.getBoards()[boardId]?.name}」`
-        : "所选资产已全部在此画布上"
+        ? t("sentToBoard", { n: added, board: this.store.getBoards()[boardId]?.name ?? "" })
+        : t("alreadyOnBoard")
     );
     this.clearSelection();
   }
@@ -1447,7 +1450,7 @@ export class GalleryView extends ItemView {
       this.app,
       this.getTheme(),
       folders,
-      `移动 ${items.length} 个资产到…`,
+      t("moveNTo", { n: items.length }),
       (folder) => {
         void (async () => {
           if (!(await this.importer.createFolderIfMissing(folder))) return;

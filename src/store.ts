@@ -9,6 +9,7 @@ import {
   emptyData,
   newId,
 } from "./types";
+import { t } from "./i18n";
 
 /**
  * 数据根目录(仓库相对路径),默认 "GalleryHub"。
@@ -82,12 +83,12 @@ export class GalleryStore {
       const raw = await ad.read(normalizePath(DB_PATH));
       const parsed = JSON.parse(raw) as GalleryData;
       if (typeof parsed.version !== "number" || !Array.isArray(parsed.items)) {
-        throw new Error("结构不完整");
+        throw new Error(t("dataCorrupt"));
       }
       if (parsed.version > SCHEMA_VERSION) {
         this.readOnly = true;
         new Notice(
-          `GalleryHub:数据版本 v${parsed.version} 高于插件支持的 v${SCHEMA_VERSION},进入只读模式,请升级插件。`,
+          t("versionTooNew", { v: parsed.version, s: SCHEMA_VERSION }),
           8000
         );
       }
@@ -102,10 +103,7 @@ export class GalleryStore {
     } catch (e) {
       this.readOnly = true;
       this.loaded = false;
-      new Notice(
-        `GalleryHub:gallery.json 读取失败(${(e as Error).message})。已进入只读模式,请检查文件或从 gallery.json.bak 恢复。`,
-        0
-      );
+      new Notice(t("loadFailed", { msg: (e as Error).message }), 0);
     }
   }
 
@@ -151,7 +149,7 @@ export class GalleryStore {
     if (this.guardReadOnly()) return null;
     const id = "b-" + newId();
     this.data.boards[id] = {
-      name: name.trim() || "未命名画布",
+      name: name.trim() || t("unnamedBoard"),
       createdAt: new Date().toISOString(),
     };
     this.emit();
@@ -297,7 +295,7 @@ export class GalleryStore {
 
   private guardReadOnly(): boolean {
     if (this.readOnly) {
-      new Notice("GalleryHub 处于只读模式,修改未保存。");
+      new Notice(t("readOnlyNotice"));
       return true;
     }
     return false;
@@ -339,7 +337,7 @@ export class GalleryStore {
       const json = JSON.stringify(this.data, null, 2);
       await ad.write(normalizePath(DB_PATH), json);
     } catch (e) {
-      new Notice(`GalleryHub:保存失败 ${(e as Error).message}`, 8000);
+      new Notice(t("saveFailed", { msg: (e as Error).message }), 8000);
     } finally {
       // 延迟复位,躲过 vault modify 事件的回调时序
       window.setTimeout(() => (this.selfWriting = false), 200);

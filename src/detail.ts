@@ -1,4 +1,5 @@
 import { App, Modal, Notice, TFile, setIcon } from "obsidian";
+import { t } from "./i18n";
 import { GalleryStore } from "./store";
 import { GalleryItem } from "./types";
 
@@ -57,7 +58,7 @@ export class DetailModal extends Modal {
       if (idx > 0) {
         const prev = contentEl.createEl("button", {
           cls: "ghub-nav-btn ghub-nav-prev",
-          attr: { "aria-label": "上一个 (←)" },
+          attr: { "aria-label": t("prevItem") },
         });
         setIcon(prev, "chevron-left");
         prev.addEventListener("click", (e) => {
@@ -68,7 +69,7 @@ export class DetailModal extends Modal {
       if (idx >= 0 && idx < this.sequence.length - 1) {
         const next = contentEl.createEl("button", {
           cls: "ghub-nav-btn ghub-nav-next",
-          attr: { "aria-label": "下一个 (→)" },
+          attr: { "aria-label": t("nextItem") },
         });
         setIcon(next, "chevron-right");
         next.addEventListener("click", (e) => {
@@ -84,7 +85,7 @@ export class DetailModal extends Modal {
       const img = stage.createEl("img", {
         attr: {
           src: this.app.vault.adapter.getResourcePath(it.path),
-          alt: it.title || it.fileName || "图片资产",
+          alt: it.title || it.fileName || t("image"),
           draggable: "false",
         },
       });
@@ -200,16 +201,16 @@ export class DetailModal extends Modal {
     typeBadge.createSpan({
       text:
         it.type === "image"
-          ? "图片"
+          ? t("image")
           : it.type === "video"
-            ? "视频"
+            ? t("video")
             : it.type === "audio"
-              ? "音频"
-              : "链接",
+              ? t("audio")
+              : t("link"),
     });
     const headActions = head.createDiv({ cls: "ghub-d-actions" });
     if (it.path) {
-      this.iconBtn(headActions, "file-symlink", "在 Obsidian 中打开原文件", () => {
+      this.iconBtn(headActions, "file-symlink", t("openInObsidian"), () => {
         const f = this.app.vault.getAbstractFileByPath(it.path!);
         if (f instanceof TFile) {
           void this.app.workspace.getLeaf(true).openFile(f);
@@ -218,17 +219,17 @@ export class DetailModal extends Modal {
       });
     }
     if (it.type === "link" && it.url) {
-      this.iconBtn(headActions, "external-link", "在浏览器打开", () =>
+      this.iconBtn(headActions, "external-link", t("openInBrowser"), () =>
         window.open(it.url)
       );
     }
     const delBtn = this.iconBtn(
       headActions,
       "trash-2",
-      "从库中移除(不删原文件)",
+      t("removeFromLibrary"),
       () => {
         this.store.deleteItem(it.id);
-        new Notice("已从库中移除(原文件未删除)");
+        new Notice(t("removedKeepFile"));
         this.close();
         this.onDeleted?.();
       }
@@ -238,7 +239,7 @@ export class DetailModal extends Modal {
     // ---- 标题(内联编辑)----
     const titleInput = bar.createEl("input", {
       cls: "ghub-title-input",
-      attr: { type: "text", placeholder: "无标题", "aria-label": "标题" },
+      attr: { type: "text", placeholder: t("detailTitlePlaceholder"), "aria-label": t("detailTitleAria") },
     });
     titleInput.value = it.title;
     titleInput.addEventListener("input", () =>
@@ -254,7 +255,7 @@ export class DetailModal extends Modal {
     // ---- 星级点选(悬停预览填充)----
     const starRow = bar.createDiv({
       cls: "ghub-starpick",
-      attr: { role: "radiogroup", "aria-label": "评分" },
+      attr: { role: "radiogroup", "aria-label": t("ratingAria") },
     });
     const renderStars = (preview?: number) => {
       starRow.empty();
@@ -263,7 +264,7 @@ export class DetailModal extends Modal {
         const s = starRow.createSpan({
           text: "★",
           cls: shown >= i ? "on" : "",
-          attr: { role: "radio", "aria-label": `${i} 星` },
+          attr: { role: "radio", "aria-label": t("nStars", { n: i }) },
         });
         s.addEventListener("click", () => {
           this.patch({ rating: this.item.rating === i ? 0 : i });
@@ -279,7 +280,7 @@ export class DetailModal extends Modal {
 
     // ---- 标签 chips 编辑器 ----
     const tagField = bar.createDiv({ cls: "ghub-field" });
-    tagField.createDiv({ cls: "ghub-field-label" }).createSpan({ text: "标签" });
+    tagField.createDiv({ cls: "ghub-field-label" }).createSpan({ text: t("tags") });
     const chipsWrap = tagField.createDiv({ cls: "ghub-chips" });
     const renderChips = () => {
       chipsWrap.empty();
@@ -295,7 +296,7 @@ export class DetailModal extends Modal {
       }
       const input = chipsWrap.createEl("input", {
         cls: "ghub-chip-input",
-        attr: { type: "text", placeholder: this.item.tags.length ? "" : "添加标签…" },
+        attr: { type: "text", placeholder: this.item.tags.length ? "" : t("tagsPlaceholder") },
       });
       const commit = () => {
         const vals = input.value
@@ -336,7 +337,7 @@ export class DetailModal extends Modal {
     renderChips();
 
     // ---- 来源 ----
-    this.field(bar, "来源链接", (wrap) => {
+    this.field(bar, t("sourceLink"), (wrap) => {
       const input = wrap.createEl("input", {
         attr: { type: "text", placeholder: "https://…" },
       });
@@ -345,11 +346,11 @@ export class DetailModal extends Modal {
     });
 
     // ---- 源文件位置(自定义,可作"图片链接") ----
-    this.field(bar, "源文件位置", (wrap) => {
+    this.field(bar, t("originPathField"), (wrap) => {
       const input = wrap.createEl("input", {
         attr: {
           type: "text",
-          placeholder: "留空 = 库内文件;可填系统路径或 URL",
+          placeholder: t("originPathPlaceholder"),
         },
       });
       input.value = it.originPath ?? "";
@@ -363,15 +364,15 @@ export class DetailModal extends Modal {
     const genHead = genSec.createDiv({ cls: "ghub-sec-head" });
     const gicon = genHead.createSpan({ cls: "ghub-sec-icon" });
     setIcon(gicon, "sparkles");
-    genHead.createSpan({ text: "AI 生成参数" });
+    genHead.createSpan({ text: t("genSection") });
 
-    this.field(genSec, "Prompt", (wrap) => {
+    this.field(genSec, t("promptLabel"), (wrap) => {
       const ta = wrap.createEl("textarea", { attr: { rows: "4" } });
       ta.value = it.gen.prompt;
       ta.addEventListener("input", () => this.patchGen({ prompt: ta.value }));
     }, () => this.item.gen.prompt);
 
-    this.field(genSec, "Negative", (wrap) => {
+    this.field(genSec, t("negativeLabel"), (wrap) => {
       const ta = wrap.createEl("textarea", { attr: { rows: "2" } });
       ta.value = it.gen.negativePrompt;
       ta.addEventListener("input", () =>
@@ -381,21 +382,21 @@ export class DetailModal extends Modal {
 
     // 模型 / Seed 双列
     const grid2 = genSec.createDiv({ cls: "ghub-grid2" });
-    this.field(grid2, "模型", (wrap) => {
+    this.field(grid2, t("modelLabel"), (wrap) => {
       const input = wrap.createEl("input", {
-        attr: { type: "text", placeholder: "flux / sd-xl…" },
+        attr: { type: "text", placeholder: t("modelPlaceholder") },
       });
       input.value = it.gen.model;
       input.addEventListener("input", () => this.patchGen({ model: input.value }));
     });
-    this.field(grid2, "Seed", (wrap) => {
+    this.field(grid2, t("seedLabel"), (wrap) => {
       const input = wrap.createEl("input", { attr: { type: "text" } });
       input.value = it.gen.seed;
       input.addEventListener("input", () => this.patchGen({ seed: input.value }));
     });
 
     // ---- 备注 ----
-    this.field(bar, "备注", (wrap) => {
+    this.field(bar, t("noteLabel"), (wrap) => {
       const ta = wrap.createEl("textarea", { attr: { rows: "3" } });
       ta.value = it.note;
       ta.addEventListener("input", () => this.patch({ note: ta.value }));
@@ -430,19 +431,19 @@ export class DetailModal extends Modal {
     if (getCopyText) {
       const btn = head.createEl("button", {
         cls: "ghub-copy-btn",
-        attr: { "aria-label": `复制 ${label}` },
+        attr: { "aria-label": t("copyAria", { label }) },
       });
       const ic = btn.createSpan();
       setIcon(ic, "copy");
-      btn.createSpan({ text: "复制" });
+      btn.createSpan({ text: t("copyBtn") });
       btn.addEventListener("click", () => {
         const text = getCopyText();
         if (!text) {
-          new Notice(`${label} 为空`);
+          new Notice(t("emptyField", { label }));
           return;
         }
         void navigator.clipboard.writeText(text);
-        new Notice(`${label} 已复制`);
+        new Notice(t("copied", { label }));
       });
     }
     build(f);
@@ -501,17 +502,17 @@ export class FolderPickModal extends Modal {
     } else {
       bar.createDiv({
         cls: "ghub-side-empty",
-        text: "还没有文件夹,在下面新建一个",
+        text: t("noFoldersYet"),
       });
     }
 
     const f = bar.createDiv({ cls: "ghub-field" });
-    f.createDiv({ cls: "ghub-field-label", text: "新建文件夹" });
+    f.createDiv({ cls: "ghub-field-label", text: t("newFolderLabel") });
     const row = f.createDiv({ cls: "ghub-newfolder-row" });
     const input = row.createEl("input", {
-      attr: { type: "text", placeholder: "文件夹名" },
+      attr: { type: "text", placeholder: t("folderNamePlaceholder") },
     });
-    const btn = row.createEl("button", { text: "创建并选择", cls: "mod-cta" });
+    const btn = row.createEl("button", { text: t("createAndSelect"), cls: "mod-cta" });
     const submit = () => {
       const name = input.value.trim();
       if (!name) return;
@@ -550,17 +551,17 @@ export class ConfirmDeleteModal extends Modal {
     this.modalEl.addClass("ghub-detail-modal", "ghub-addlink", this.themeClass);
     const bar = this.contentEl.createDiv({ cls: "ghub-panelbar" });
     bar.createEl("h3", {
-      text: this.titleText ?? `删除 ${this.count} 个资产?`,
+      text: this.titleText ?? t("deleteNAssets", { n: this.count }),
     });
     bar.createDiv({
       cls: "ghub-side-empty",
       text:
         this.descText ??
-        "「仅移出库」保留原文件;「删除文件」将文件移入系统回收站。",
+        t("deleteChoiceDesc"),
     });
     const actions = bar.createDiv({ cls: "ghub-actions" });
     if (!this.simpleMode) {
-      const a = actions.createEl("button", { text: "仅移出库(保留文件)" });
+      const a = actions.createEl("button", { text: t("removeOnlyBtn") });
       a.addEventListener("click", () => {
         this.onConfirm(false);
         this.close();
@@ -568,15 +569,15 @@ export class ConfirmDeleteModal extends Modal {
     }
     const b = actions.createEl("button", {
       text: this.simpleMode
-        ? "确认删除(可从回收站恢复)"
-        : "移出库并删除文件(可从回收站恢复)",
+        ? t("confirmDeleteBtn")
+        : t("removeAndTrashBtn"),
       cls: "ghub-danger",
     });
     b.addEventListener("click", () => {
       this.onConfirm(true);
       this.close();
     });
-    const c = actions.createEl("button", { text: "取消" });
+    const c = actions.createEl("button", { text: t("cancel") });
     c.addEventListener("click", () => this.close());
   }
 
@@ -599,18 +600,18 @@ export class BatchEditModal extends Modal {
   onOpen(): void {
     this.modalEl.addClass("ghub-detail-modal", "ghub-addlink", this.themeClass);
     const bar = this.contentEl.createDiv({ cls: "ghub-panelbar" });
-    bar.createEl("h3", { text: `批量编辑 ${this.items.length} 个资产` });
+    bar.createEl("h3", { text: t("batchEditTitle", { n: this.items.length }) });
 
     // ---- 标签 ----
     let tagMode: "add" | "replace" | "remove" = "add";
     let tagInput = "";
     const tf = bar.createDiv({ cls: "ghub-field" });
-    tf.createDiv({ cls: "ghub-field-label" }).createSpan({ text: "标签" });
+    tf.createDiv({ cls: "ghub-field-label" }).createSpan({ text: t("tags") });
     const modeRow = tf.createDiv({ cls: "ghub-batch-modes" });
     const modes: Array<["add" | "replace" | "remove", string]> = [
-      ["add", "追加"],
-      ["replace", "替换全部"],
-      ["remove", "移除"],
+      ["add", t("tagModeAdd")],
+      ["replace", t("tagModeReplace")],
+      ["remove", t("tagModeRemove")],
     ];
     const modeBtns = new Map<string, HTMLElement>();
     for (const [m, label] of modes) {
@@ -625,14 +626,14 @@ export class BatchEditModal extends Modal {
       });
     }
     const ti = tf.createEl("input", {
-      attr: { type: "text", placeholder: "逗号分隔多个标签" },
+      attr: { type: "text", placeholder: t("batchTagsPlaceholder") },
     });
     ti.addEventListener("input", () => (tagInput = ti.value));
 
     // ---- 星级 ----
     let rating: number | null = null; // null = 不修改
     const rf = bar.createDiv({ cls: "ghub-field" });
-    rf.createDiv({ cls: "ghub-field-label" }).createSpan({ text: "星级" });
+    rf.createDiv({ cls: "ghub-field-label" }).createSpan({ text: t("starLabel") });
     const starRow = rf.createDiv({ cls: "ghub-starpick" });
     const renderStars = () => {
       starRow.empty();
@@ -650,10 +651,10 @@ export class BatchEditModal extends Modal {
         cls: "ghub-batch-star-hint",
         text:
           rating === null
-            ? "(不修改)"
+            ? t("starNoChange")
             : rating === 0
-              ? "(清除评分)"
-              : `${rating} 星`,
+              ? t("starClear")
+              : t("nStars", { n: rating }),
       });
       hint.addEventListener("click", () => {
         rating = rating === 0 ? null : 0;
@@ -663,12 +664,12 @@ export class BatchEditModal extends Modal {
     renderStars();
     rf.createDiv({
       cls: "ghub-side-empty",
-      text: "点星星设置;再点取消;点右侧文字在「不修改/清除评分」间切换",
+      text: t("starHint"),
     });
 
     // ---- 应用 ----
     const actions = bar.createDiv({ cls: "ghub-actions" });
-    const apply = actions.createEl("button", { text: "应用", cls: "mod-cta" });
+    const apply = actions.createEl("button", { text: t("apply"), cls: "mod-cta" });
     apply.addEventListener("click", () => {
       const tags = tagInput
         .split(/[,，]/)
@@ -695,10 +696,10 @@ export class BatchEditModal extends Modal {
           changed++;
         }
       }
-      new Notice(changed ? `已更新 ${changed} 个资产` : "没有需要修改的内容");
+      new Notice(changed ? t("updatedN", { n: changed }) : t("nothingToUpdate"));
       this.close();
     });
-    const cancel = actions.createEl("button", { text: "取消" });
+    const cancel = actions.createEl("button", { text: t("cancel") });
     cancel.addEventListener("click", () => this.close());
   }
 
@@ -726,11 +727,11 @@ export class ConfirmTrashModal extends Modal {
     const badge = head.createSpan({ cls: "ghub-d-type" });
     const ic = badge.createSpan();
     setIcon(ic, "trash-2");
-    badge.createSpan({ text: `删除 ${this.count} 个资产的文件?` });
+    badge.createSpan({ text: t("trashNTitle", { n: this.count }) });
 
     bar.createDiv({
       cls: "ghub-side-empty",
-      text: "将从库中移除并把文件移入系统回收站(可恢复)。",
+      text: t("trashDesc"),
     });
 
     let skip = false;
@@ -739,21 +740,21 @@ export class ConfirmTrashModal extends Modal {
       attr: { type: "checkbox", id: "ghub-skip-confirm" },
     });
     skipRow.createEl("label", {
-      text: "不再提醒(可在设置中恢复)",
+      text: t("dontAskAgain"),
       attr: { for: "ghub-skip-confirm" },
     });
     cb.addEventListener("change", () => (skip = cb.checked));
 
     const actions = bar.createDiv({ cls: "ghub-actions" });
     const ok = actions.createEl("button", {
-      text: "删除(进回收站)",
+      text: t("trashBtn"),
       cls: "ghub-danger",
     });
     ok.addEventListener("click", () => {
       this.onConfirm(skip);
       this.close();
     });
-    const cancel = actions.createEl("button", { text: "取消" });
+    const cancel = actions.createEl("button", { text: t("cancel") });
     cancel.addEventListener("click", () => this.close());
   }
 
@@ -782,20 +783,20 @@ export class AddLinkModal extends Modal {
     const badge = head.createSpan({ cls: "ghub-d-type" });
     const ic = badge.createSpan();
     setIcon(ic, "link");
-    badge.createSpan({ text: "添加链接" });
+    badge.createSpan({ text: t("addLinkTitle") });
 
     let url = "";
     let title = "";
     const f1 = bar.createDiv({ cls: "ghub-field" });
-    f1.createDiv({ cls: "ghub-field-label" }).createSpan({ text: "URL" });
+    f1.createDiv({ cls: "ghub-field-label" }).createSpan({ text: t("urlLabel") });
     const urlInput = f1.createEl("input", {
       attr: { type: "text", placeholder: "https://…" },
     });
     urlInput.addEventListener("input", () => (url = urlInput.value.trim()));
     const f2 = bar.createDiv({ cls: "ghub-field" });
-    f2.createDiv({ cls: "ghub-field-label" }).createSpan({ text: "标题(可选)" });
+    f2.createDiv({ cls: "ghub-field-label" }).createSpan({ text: t("titleOptional") });
     const titleInput = f2.createEl("input", {
-      attr: { type: "text", placeholder: "留空自动取域名" },
+      attr: { type: "text", placeholder: t("titleAutoDomain") },
     });
     titleInput.addEventListener("input", () => (title = titleInput.value.trim()));
 
@@ -811,9 +812,9 @@ export class AddLinkModal extends Modal {
     });
 
     const actions = bar.createDiv({ cls: "ghub-actions" });
-    const ok = actions.createEl("button", { text: "添加", cls: "mod-cta" });
+    const ok = actions.createEl("button", { text: t("add"), cls: "mod-cta" });
     ok.addEventListener("click", submit);
-    const cancel = actions.createEl("button", { text: "取消" });
+    const cancel = actions.createEl("button", { text: t("cancel") });
     cancel.addEventListener("click", () => this.close());
 
     window.setTimeout(() => urlInput.focus(), 30);

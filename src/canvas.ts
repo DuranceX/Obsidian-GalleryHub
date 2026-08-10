@@ -1,6 +1,7 @@
 import { App, Menu, setIcon } from "obsidian";
 import { GalleryStore } from "./store";
 import { GalleryItem, LayoutPos, BoardElement, ELEMENT_COLORS } from "./types";
+import { t } from "./i18n";
 import { DetailModal } from "./detail";
 import { Importer } from "./importer";
 
@@ -253,17 +254,17 @@ export class CanvasBoard {
       const wy = (e.clientY - rect.top - this.ty) / this.scale;
       const menu = new Menu();
       menu.addItem((mi) =>
-        mi.setTitle("添加文字").setIcon("type").onClick(() => this.addText(wx, wy))
+        mi.setTitle(t("addText")).setIcon("type").onClick(() => this.addText(wx, wy))
       );
       menu.addItem((mi) =>
-        mi.setTitle("添加画框").setIcon("square").onClick(() => this.addFrame(wx, wy))
+        mi.setTitle(t("addFrame")).setIcon("square").onClick(() => this.addFrame(wx, wy))
       );
       menu.addSeparator();
       menu.addItem((mi) =>
-        mi.setTitle("适应全部").setIcon("maximize").onClick(() => this.fitAll())
+        mi.setTitle(t("fitAll")).setIcon("maximize").onClick(() => this.fitAll())
       );
       menu.addItem((mi) =>
-        mi.setTitle("重置缩放 (100%)").setIcon("search").onClick(() => {
+        mi.setTitle(t("resetZoom")).setIcon("search").onClick(() => {
           this.scale = 1;
           this.applyTransform();
         })
@@ -285,17 +286,17 @@ export class CanvasBoard {
       btn.addEventListener("click", onClick);
       return btn;
     };
-    tool("type", "添加文字(落在视口中心)", () => {
+    tool("type", t("addTextCenter"), () => {
       const c = this.centerWorld();
       this.addText(c.x, c.y);
     });
-    tool("square", "添加画框(落在视口中心)", () => {
+    tool("square", t("addFrameCenter"), () => {
       const c = this.centerWorld();
       this.addFrame(c.x - 240, c.y - 160);
     });
     bar.createDiv({ cls: "ghub-cbar-sep" });
-    tool("maximize", "适应全部", () => this.fitAll());
-    tool("search", "重置缩放 100%", () => {
+    tool("maximize", t("fitAll"), () => this.fitAll());
+    tool("search", t("resetZoom"), () => {
       this.scale = 1;
       this.applyTransform();
     });
@@ -320,7 +321,7 @@ export class CanvasBoard {
       y,
       w: 480,
       h: 320,
-      text: "分组",
+      text: t("frameDefaultLabel"),
     });
   }
 
@@ -409,7 +410,7 @@ export class CanvasBoard {
     if (!items.length && !this.store.boardElements(this.boardId).length) {
       const empty = this.worldEl.createDiv({ cls: "ghub-canvas-empty" });
       empty.setText(
-        "画布是空的 — 在画廊中多选资产后「发送到画布」,把文件直接拖进来,或用左上工具栏添加文字/画框"
+        t("canvasEmpty")
       );
     }
   }
@@ -435,7 +436,7 @@ export class CanvasBoard {
     });
     textEl.setText(el.text);
     if (el.kind === "text" && !el.text) {
-      textEl.dataset.placeholder = "双击输入文字…";
+      textEl.dataset.placeholder = t("textPlaceholder");
     }
     const startEdit = () => {
       textEl.setAttribute("contenteditable", "true");
@@ -569,10 +570,10 @@ export class CanvasBoard {
       e.stopPropagation();
       const menu = new Menu();
       menu.addItem((mi) =>
-        mi.setTitle("编辑文字").setIcon("pencil").onClick(() => startEdit())
+        mi.setTitle(t("editText")).setIcon("pencil").onClick(() => startEdit())
       );
       menu.addItem((mi) =>
-        mi.setTitle("颜色…").setIcon("palette").onClick(() => {
+        mi.setTitle(t("colorMenu")).setIcon("palette").onClick(() => {
           this.showColorPicker(e.clientX, e.clientY, el.color, (color) => {
             el.color = color || undefined;
             this.store.updateBoardElement(
@@ -587,7 +588,7 @@ export class CanvasBoard {
       );
       menu.addSeparator();
       menu.addItem((mi) =>
-        mi.setTitle("删除").setIcon("trash-2").onClick(() => {
+        mi.setTitle(t("del")).setIcon("trash-2").onClick(() => {
           this.store.deleteBoardElement(this.boardId, el.id);
         })
       );
@@ -605,7 +606,8 @@ export class CanvasBoard {
     const pop = document.body.createDiv({ cls: "ghub-colorpop" });
     pop.style.left = `${Math.min(x, window.innerWidth - 240)}px`;
     pop.style.top = `${Math.min(y, window.innerHeight - 60)}px`;
-    for (const [color, label] of ELEMENT_COLORS) {
+    for (const [color, labelKey] of ELEMENT_COLORS) {
+      const label = t(labelKey);
       const dot = pop.createDiv({
         cls: "ghub-colordot" + ((current ?? "") === color ? " is-current" : ""),
         attr: { "aria-label": label, title: label },
@@ -816,12 +818,12 @@ export class CanvasBoard {
       e.stopPropagation();
       const menu = new Menu();
       menu.addItem((mi) =>
-        mi.setTitle("置顶").setIcon("arrow-up-to-line").onClick(() => {
+        mi.setTitle(t("bringToFront")).setIcon("arrow-up-to-line").onClick(() => {
           this.bringToFront(it, node);
         })
       );
       menu.addItem((mi) =>
-        mi.setTitle("置底").setIcon("arrow-down-to-line").onClick(() => {
+        mi.setTitle(t("sendToBack")).setIcon("arrow-down-to-line").onClick(() => {
           const min = Math.min(
             0,
             ...this.store
@@ -835,13 +837,13 @@ export class CanvasBoard {
         })
       );
       menu.addItem((mi) =>
-        mi.setTitle("打开详情").setIcon("info").onClick(() => {
+        mi.setTitle(t("openDetail")).setIcon("info").onClick(() => {
           new DetailModal(this.app, this.store, it, this.getTheme()).open();
         })
       );
       menu.addSeparator();
       menu.addItem((mi) =>
-        mi.setTitle("从画布移除(不影响库)").setIcon("x").onClick(() => {
+        mi.setTitle(t("removeFromBoard")).setIcon("x").onClick(() => {
           this.store.setLayout(it.id, this.boardId, null);
         })
       );
