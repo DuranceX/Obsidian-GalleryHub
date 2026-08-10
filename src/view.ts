@@ -1148,8 +1148,15 @@ export class GalleryView extends ItemView {
         if (heights[i] < heights[target]) target = i;
       }
       cols[target].appendChild(this.card(it));
-      // 用已知宽高比估算卡片高度;未知(旧数据/视频/链接)按 4:3 估
-      const ratio = it.w && it.h ? it.h / it.w : 0.75;
+      // 估算卡片高度占比:图片按宽高比;音频/链接为紧凑固定高;视频兜底 4:3
+      const ratio =
+        it.w && it.h
+          ? it.h / it.w
+          : it.type === "audio"
+            ? 0.45
+            : it.type === "link"
+              ? 0.35
+              : 0.75;
       heights[target] += ratio + 0.06; // 0.06 ≈ 卡片间距占比
     }
   }

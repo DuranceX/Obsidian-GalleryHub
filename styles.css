@@ -435,15 +435,15 @@
   flex-shrink: 0;
 }
 
-/* ---- 音频卡片 ---- */
+/* ---- 音频卡片(紧凑) ---- */
 .ghub-audiobox {
-  aspect-ratio: 4 / 3;
+  min-height: 92px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px;
+  gap: 5px;
+  padding: 10px 8px 8px;
   background: radial-gradient(
     ellipse at center,
     var(--ghub-panel-2),
@@ -452,15 +452,19 @@
 }
 
 .ghub-audiobox-icon {
-  --icon-size: 30px;
+  --icon-size: 18px;
   color: var(--ghub-muted);
   display: flex;
+}
+
+.ghub-audiobox .ghub-linkbox-domain {
+  font-size: 10.5px;
 }
 
 .ghub-audio-player {
   width: 100%;
   max-width: 210px;
-  height: 30px;
+  height: 26px;
 }
 
 /* 详情舞台音频 */
@@ -496,12 +500,13 @@
 
 /* ---- 链接卡片 ---- */
 .ghub-linkbox {
-  aspect-ratio: 4 / 3;
+  min-height: 72px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 9px;
+  gap: 6px;
+  padding: 12px 8px;
   background: radial-gradient(
     ellipse at center,
     var(--ghub-panel-2),
@@ -510,7 +515,7 @@
 }
 
 .ghub-linkbox-icon {
-  --icon-size: 28px;
+  --icon-size: 18px;
   color: var(--ghub-muted);
   display: flex;
 }
