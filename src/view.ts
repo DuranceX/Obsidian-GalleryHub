@@ -30,6 +30,9 @@ export class GalleryView extends ItemView {
   private gridEl!: HTMLElement;
   private countEl!: HTMLElement;
   private observer: IntersectionObserver | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private colCount = 0;
+  private resizeTimer: number | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -110,12 +113,25 @@ export class GalleryView extends ItemView {
     });
 
     this.unsubscribe = this.store.onChange(() => this.render());
+
+    // 容器宽度变化 → 列数变化时重排(防抖,避免拖动面板时狂刷)
+    this.resizeObserver = new ResizeObserver(() => {
+      if (this.resizeTimer !== null) window.clearTimeout(this.resizeTimer);
+      this.resizeTimer = window.setTimeout(() => {
+        this.resizeTimer = null;
+        if (this.computeColCount() !== this.colCount) this.renderGrid();
+      }, 120);
+    });
+    this.resizeObserver.observe(this.gridEl);
+
     this.render();
   }
 
   async onClose(): Promise<void> {
     this.unsubscribe?.();
     this.observer?.disconnect();
+    this.resizeObserver?.disconnect();
+    if (this.resizeTimer !== null) window.clearTimeout(this.resizeTimer);
   }
 
   // ---------- 顶栏 ----------
@@ -294,6 +310,12 @@ export class GalleryView extends ItemView {
     });
   }
 
+  /** 目标列宽 220px,按容器实际宽度算列数 */
+  private computeColCount(): number {
+    const w = this.gridEl.clientWidth || 800;
+    return Math.max(1, Math.min(8, Math.floor(w / 230)));
+  }
+
   private renderGrid(): void {
     const items = this.filtered();
     this.countEl.setText(
@@ -328,8 +350,27 @@ export class GalleryView extends ItemView {
       return;
     }
 
-    for (const it of items) {
-      this.gridEl.appendChild(this.card(it));
+    // JS 瀑布流:新→旧排序,从左到右放入"当前最矮的列"
+    // (CSS columns 是竖排+滚动重排,顺序和稳定性都不对,弃用)
+    const sorted = [...items].sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt)
+    );
+    this.colCount = this.computeColCount();
+    const cols: HTMLElement[] = [];
+    const heights: number[] = [];
+    for (let i = 0; i < this.colCount; i++) {
+      cols.push(this.gridEl.createDiv({ cls: "ghub-col" }));
+      heights.push(0);
+    }
+    for (const it of sorted) {
+      let target = 0;
+      for (let i = 1; i < heights.length; i++) {
+        if (heights[i] < heights[target]) target = i;
+      }
+      cols[target].appendChild(this.card(it));
+      // 用已知宽高比估算卡片高度;未知(旧数据/视频/链接)按 4:3 估
+      const ratio = it.w && it.h ? it.h / it.w : 0.75;
+      heights[target] += ratio + 0.06; // 0.06 ≈ 卡片间距占比
     }
   }
 

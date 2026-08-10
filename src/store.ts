@@ -122,8 +122,16 @@ export class GalleryStore {
 
   addItem(item: GalleryItem): void {
     if (this.guardReadOnly()) return;
-    this.data.items.push(item);
-    this.data.items.sort((a, b) => a.id.localeCompare(b.id)); // 稳定排序,减小同步 diff
+    this.data.items.push(item); // 文件内保持插入(时间)顺序,展示排序由视图决定
+    this.emit();
+    this.scheduleSave();
+  }
+
+  /** 批量入库:单次通知与单次保存,避免导入多文件时逐条全量刷新 */
+  addItems(items: GalleryItem[]): void {
+    if (this.guardReadOnly()) return;
+    if (!items.length) return;
+    this.data.items.push(...items);
     this.emit();
     this.scheduleSave();
   }

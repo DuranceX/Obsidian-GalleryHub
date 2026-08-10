@@ -32,24 +32,28 @@ export class Importer {
   }
 
   async importFiles(files: FileList | File[]): Promise<number> {
-    let ok = 0;
+    const batch: GalleryItem[] = [];
     for (const file of Array.from(files)) {
       try {
-        if (await this.importOne(file)) ok++;
+        const item = await this.buildItem(file);
+        if (item) batch.push(item);
       } catch (e) {
         new Notice(`导入 ${file.name} 失败:${(e as Error).message}`, 6000);
       }
     }
-    if (ok > 0) new Notice(`已导入 ${ok} 个资产`);
-    return ok;
+    // 整批一次性入库:单次刷新、单次保存
+    this.store.addItems(batch);
+    if (batch.length) new Notice(`已导入 ${batch.length} 个资产`);
+    return batch.length;
   }
 
-  private async importOne(file: File): Promise<boolean> {
+  /** 落盘并构造条目,不直接入库(由 importFiles 批量提交) */
+  private async buildItem(file: File): Promise<GalleryItem | null> {
     const ext = file.name.split(".").pop() ?? "";
     const type = typeFromExt(ext);
     if (!type) {
       new Notice(`跳过不支持的格式:${file.name}`);
-      return false;
+      return null;
     }
     const id = newId();
     const bucket = this.monthBucket();
@@ -62,7 +66,7 @@ export class Importer {
     const size = type === "image" ? await probeImageSize(buf) : null;
 
     const now = new Date().toISOString();
-    const item: GalleryItem = {
+    return {
       id,
       type,
       createdAt: now,
@@ -80,8 +84,6 @@ export class Importer {
       gen: emptyGen(),
       layouts: {},
     };
-    this.store.addItem(item);
-    return true;
   }
 
   /** 登记仓库内已有文件(不复制,原地登记) */
