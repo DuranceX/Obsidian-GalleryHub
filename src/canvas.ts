@@ -838,6 +838,9 @@ export class CanvasBoard {
     /** 拖动开始时各参与卡片/元素的原始位置 */
     let dragOrigin: Map<string, { x: number; y: number }> = new Map();
     let dragElOrigin: Map<string, { x: number; y: number }> = new Map();
+    let lastMoveX = 0;
+    let lastMoveY = 0;
+    let moveRaf: number | null = null;
     node.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       if ((e.target as HTMLElement).closest(".ghub-cnode-resize")) return;
@@ -877,44 +880,61 @@ export class CanvasBoard {
       }
       node.addClass("is-dragging");
       node.setPointerCapture(e.pointerId);
-      this.bringToFront(it, node);
+      // 不在此处 bringToFront:拖动中 appendChild 会移动 DOM 节点,
+      // 浏览器随即丢弃 pointer capture,导致鼠标移出卡片后拖动中断。
+      // 先用 z-index 视觉置顶,松手后再真正调整 DOM/z 序。
+      node.style.zIndex = "9999";
       e.stopPropagation();
     });
     node.addEventListener("pointermove", (e) => {
       if (!dragging) return;
-      const dx = (e.clientX - sx) / this.scale;
-      const dy = (e.clientY - sy) / this.scale;
-      for (const [id, o] of dragOrigin) {
-        const item = this.store.getItem(id);
-        const p = item?.layouts[this.boardId];
-        const el = this.cardEls.get(id);
-        if (!p || !el) continue;
-        p.x = o.x + dx;
-        p.y = o.y + dy;
-        el.style.left = `${p.x}px`;
-        el.style.top = `${p.y}px`;
-      }
-      for (const [id, o] of dragElOrigin) {
-        const be = this.store
-          .boardElements(this.boardId)
-          .find((x) => x.id === id);
-        const dom = this.elEls.get(id);
-        if (!be || !dom) continue;
-        be.x = o.x + dx;
-        be.y = o.y + dy;
-        dom.style.left = `${be.x}px`;
-        dom.style.top = `${be.y}px`;
-      }
+      // 用最新指针坐标在 rAF 中合帧渲染,减少同帧多次布局,更跟手
+      lastMoveX = e.clientX;
+      lastMoveY = e.clientY;
+      if (moveRaf !== null) return;
+      moveRaf = window.requestAnimationFrame(() => {
+        moveRaf = null;
+        const dx = (lastMoveX - sx) / this.scale;
+        const dy = (lastMoveY - sy) / this.scale;
+        for (const [id, o] of dragOrigin) {
+          const item = this.store.getItem(id);
+          const p = item?.layouts[this.boardId];
+          const el = this.cardEls.get(id);
+          if (!p || !el) continue;
+          p.x = o.x + dx;
+          p.y = o.y + dy;
+          el.style.left = `${p.x}px`;
+          el.style.top = `${p.y}px`;
+        }
+        for (const [id, o] of dragElOrigin) {
+          const be = this.store
+            .boardElements(this.boardId)
+            .find((x) => x.id === id);
+          const dom = this.elEls.get(id);
+          if (!be || !dom) continue;
+          be.x = o.x + dx;
+          be.y = o.y + dy;
+          dom.style.left = `${be.x}px`;
+          dom.style.top = `${be.y}px`;
+        }
+      });
     });
     const endDrag = (e: PointerEvent) => {
       if (!dragging) return;
       dragging = false;
+      if (moveRaf !== null) {
+        window.cancelAnimationFrame(moveRaf);
+        moveRaf = null;
+      }
       node.removeClass("is-dragging");
+      node.style.zIndex = "";
       try {
         node.releasePointerCapture(e.pointerId);
       } catch {
         /* ignore */
       }
+      // 拖动结束后再真正置顶(DOM 移动 + z 序落库)
+      this.bringToFront(it, node);
       const ids = [...dragOrigin.keys()];
       ids.forEach((id, i) => {
         const p = this.store.getItem(id)?.layouts[this.boardId];
