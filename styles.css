@@ -435,15 +435,12 @@
   flex-shrink: 0;
 }
 
-/* ---- 音频卡片(紧凑) ---- */
+/* ---- 音频卡片(紧凑,图标+名称并排) ---- */
 .ghub-audiobox {
-  min-height: 92px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 10px 8px 8px;
+  gap: 7px;
+  padding: 10px;
   background: radial-gradient(
     ellipse at center,
     var(--ghub-panel-2),
@@ -451,19 +448,29 @@
   );
 }
 
+.ghub-audiobox-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
 .ghub-audiobox-icon {
-  --icon-size: 18px;
+  --icon-size: 15px;
   color: var(--ghub-muted);
   display: flex;
+  flex-shrink: 0;
 }
 
 .ghub-audiobox .ghub-linkbox-domain {
-  font-size: 10.5px;
+  font-size: 11px;
+  max-width: none;
+  flex: 1;
+  text-align: left;
 }
 
 .ghub-audio-player {
   width: 100%;
-  max-width: 210px;
   height: 26px;
 }
 
@@ -499,14 +506,13 @@
 }
 
 /* ---- 链接卡片 ---- */
+/* ---- 链接卡片(紧凑,图标+域名并排) ---- */
 .ghub-linkbox {
-  min-height: 72px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 12px 8px;
+  gap: 8px;
+  padding: 14px 12px;
   background: radial-gradient(
     ellipse at center,
     var(--ghub-panel-2),
@@ -515,9 +521,10 @@
 }
 
 .ghub-linkbox-icon {
-  --icon-size: 18px;
+  --icon-size: 15px;
   color: var(--ghub-muted);
   display: flex;
+  flex-shrink: 0;
 }
 
 .ghub-linkbox-domain {

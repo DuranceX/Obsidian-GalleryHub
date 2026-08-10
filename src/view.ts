@@ -1234,9 +1234,10 @@ export class GalleryView extends ItemView {
       card.addEventListener("mouseleave", () => video.pause());
     } else if (it.type === "audio" && it.path) {
       const box = thumb.createDiv({ cls: "ghub-audiobox" });
-      const ic = box.createDiv({ cls: "ghub-audiobox-icon" });
+      const head = box.createDiv({ cls: "ghub-audiobox-head" });
+      const ic = head.createDiv({ cls: "ghub-audiobox-icon" });
       setIcon(ic, "music");
-      box.createDiv({
+      head.createDiv({
         cls: "ghub-linkbox-domain",
         text: it.fileName ?? "",
       });
