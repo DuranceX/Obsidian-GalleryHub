@@ -1,7 +1,7 @@
 {
   "id": "gallery-hub",
   "name": "GalleryHub",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "minAppVersion": "1.5.0",
   "description": "美术资产画廊:统一管理图片、视频、链接与 AI 生图 prompt 元数据,支持筛选、搜索与画布策展。",
   "author": "DuranceX",
