@@ -305,6 +305,9 @@ export class GalleryView extends ItemView {
   private setMode(mode: "grid" | "canvas"): void {
     if (this.mode === mode) return;
     this.mode = mode;
+    // 先切换容器可见性(移除 display:none),再渲染 —— 否则网格在隐藏状态下
+    // clientWidth=0,列数算成 1,图片先撑满整行再被 ResizeObserver 重排(闪烁)
+    this.updateToolbarMode();
     if (mode === "canvas") {
       // 默认进入第一个画布
       if (!this.activeBoardId) {
@@ -317,7 +320,6 @@ export class GalleryView extends ItemView {
       this.canvas = null;
       this.renderGrid();
     }
-    this.updateToolbarMode();
   }
 
   private updateToolbarMode(): void {
@@ -970,9 +972,10 @@ export class GalleryView extends ItemView {
     });
   }
 
-  /** 目标列宽 220px,按容器实际宽度算列数 */
+  /** 目标列宽 220px,按容器实际宽度算列数;容器隐藏/未布局时返回 0 表示暂不可排 */
   private computeColCount(): number {
-    const w = this.gridEl.clientWidth || 800;
+    const w = this.gridEl.clientWidth;
+    if (!w) return 0;
     return Math.max(1, Math.min(8, Math.floor(w / 230)));
   }
 
@@ -1027,6 +1030,13 @@ export class GalleryView extends ItemView {
     // (CSS columns 是竖排+滚动重排,顺序和稳定性都不对,弃用)
     const sorted = this.sortItems(items);
     this.colCount = this.computeColCount();
+    if (!this.colCount) {
+      // 容器尚无宽度(隐藏或未完成布局):等下一帧再排,避免按错误列数闪烁
+      window.requestAnimationFrame(() => {
+        if (this.mode === "grid") this.renderGrid();
+      });
+      return;
+    }
     const cols: HTMLElement[] = [];
     const heights: number[] = [];
     for (let i = 0; i < this.colCount; i++) {
