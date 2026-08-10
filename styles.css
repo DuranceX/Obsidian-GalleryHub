@@ -1445,9 +1445,150 @@
   opacity: 1;
 }
 
-/* 画布选择器 */
-.ghub-board-sel {
-  max-width: 180px;
+/* 画布切换按钮(与工具栏控件统一样式) */
+.ghub-root button.ghub-board-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 200px;
+  padding: 5px 12px !important;
+}
+
+.ghub-board-btn-ic {
+  display: flex;
+  align-items: center;
+  --icon-size: 13px;
+  color: var(--ghub-muted);
+}
+
+.ghub-board-btn-t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+/* ================= 画布悬浮工具栏 ================= */
+.ghub-cbar {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ghub-panel) 88%, transparent);
+  border: 1px solid var(--ghub-border);
+  box-shadow: var(--ghub-shadow);
+  backdrop-filter: blur(6px);
+}
+
+.ghub-root button.ghub-cbar-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  --icon-size: 15px;
+  background: transparent !important;
+  border: none !important;
+  color: var(--ghub-muted) !important;
+}
+
+.ghub-root button.ghub-cbar-btn:hover {
+  background: var(--ghub-panel-2) !important;
+  color: var(--ghub-text) !important;
+}
+
+.ghub-cbar-sep {
+  height: 1px;
+  margin: 2px 4px;
+  background: var(--ghub-border);
+}
+
+/* ================= 画布元素(文字/画框) ================= */
+.ghub-cel {
+  position: absolute;
+  user-select: none;
+}
+
+.ghub-cel.is-dragging {
+  opacity: 0.85;
+}
+
+.ghub-cel .ghub-cel-text {
+  outline: none;
+  cursor: text;
+  user-select: text;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.ghub-cel .ghub-cel-text:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ghub-faint);
+}
+
+/* 文字元素 */
+.ghub-cel-text.ghub-cel,
+.ghub-cel.ghub-cel-text {
+  min-height: 1em;
+}
+
+.ghub-cel.ghub-cel-text {
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: grab;
+}
+
+.ghub-cel.ghub-cel-text .ghub-cel-text {
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--ghub-text);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.ghub-cel.ghub-cel-text:hover {
+  outline: 1.5px dashed color-mix(in srgb, var(--ghub-accent) 55%, transparent);
+}
+
+/* 画框元素 */
+.ghub-cel.ghub-cel-frame {
+  border: 2px solid color-mix(in srgb, var(--ghub-accent) 55%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ghub-accent) 5%, transparent);
+  cursor: grab;
+}
+
+.ghub-cel.ghub-cel-frame:hover {
+  border-color: var(--ghub-accent);
+}
+
+.ghub-cel.ghub-cel-frame .ghub-cel-text {
+  position: absolute;
+  left: 10px;
+  top: -12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ghub-accent);
+  background: var(--ghub-stage);
+  padding: 1px 8px;
+  border-radius: 5px;
+  max-width: calc(100% - 20px);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ghub-cel .ghub-cnode-resize {
+  opacity: 0;
+}
+
+.ghub-cel:hover .ghub-cnode-resize {
+  opacity: 1;
 }
 
 /* ================= 动效降级 ================= */

@@ -80,6 +80,20 @@ export interface GalleryItem {
 export interface BoardMeta {
   name: string;
   createdAt: string;
+  /** 画布元素(文字/画框),可选字段向后兼容 */
+  elements?: BoardElement[];
+}
+
+/** 画布上的注释元素 */
+export interface BoardElement {
+  id: string;
+  kind: "text" | "frame";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** text: 文字内容;frame: 框标题 */
+  text: string;
 }
 
 export interface GalleryData {

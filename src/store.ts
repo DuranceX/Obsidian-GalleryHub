@@ -3,6 +3,7 @@ import {
   GalleryData,
   GalleryItem,
   BoardMeta,
+  BoardElement,
   LayoutPos,
   SCHEMA_VERSION,
   emptyData,
@@ -164,6 +165,48 @@ export class GalleryStore {
   /** 画布上条目(带布局) */
   itemsOnBoard(boardId: string): GalleryItem[] {
     return this.data.items.filter((it) => it.layouts[boardId]);
+  }
+
+  // ---------- 画布元素(文字/画框) ----------
+
+  boardElements(boardId: string): BoardElement[] {
+    return this.data.boards[boardId]?.elements ?? [];
+  }
+
+  addBoardElement(boardId: string, el: Omit<BoardElement, "id">): string | null {
+    if (this.guardReadOnly()) return null;
+    const b = this.data.boards[boardId];
+    if (!b) return null;
+    const id = "e-" + newId();
+    (b.elements ??= []).push({ ...el, id });
+    this.emit();
+    this.scheduleSave();
+    return id;
+  }
+
+  updateBoardElement(
+    boardId: string,
+    elId: string,
+    patch: Partial<BoardElement>,
+    quiet = false
+  ): void {
+    if (this.guardReadOnly()) return;
+    const el = this.data.boards[boardId]?.elements?.find((e) => e.id === elId);
+    if (!el) return;
+    Object.assign(el, patch);
+    if (!quiet) this.emit();
+    this.scheduleSave();
+  }
+
+  deleteBoardElement(boardId: string, elId: string): void {
+    if (this.guardReadOnly()) return;
+    const b = this.data.boards[boardId];
+    if (!b?.elements) return;
+    const idx = b.elements.findIndex((e) => e.id === elId);
+    if (idx < 0) return;
+    b.elements.splice(idx, 1);
+    this.emit();
+    this.scheduleSave();
   }
 
   /**

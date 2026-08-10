@@ -75,7 +75,7 @@ export class GalleryView extends ItemView {
   private canvas: CanvasBoard | null = null;
   private activeBoardId: string | null = null;
   private modeBtns: { grid: HTMLElement; canvas: HTMLElement } | null = null;
-  private boardSelEl: HTMLSelectElement | null = null;
+  private boardBtnEl: HTMLButtonElement | null = null;
   private searchEl: HTMLInputElement | null = null;
   private sortSelEl: HTMLSelectElement | null = null;
 
@@ -233,23 +233,44 @@ export class GalleryView extends ItemView {
     canvasBtn.addEventListener("click", () => this.setMode("canvas"));
     this.modeBtns = { grid: gridBtn, canvas: canvasBtn };
 
-    // 画布选择器(画布模式可见)
-    this.boardSelEl = bar.createEl("select", {
-      cls: "ghub-sort ghub-board-sel",
-      attr: { "aria-label": "选择画布" },
+    // 画布选择器(画布模式可见):按钮 + Menu,与工具栏样式统一
+    this.boardBtnEl = bar.createEl("button", {
+      cls: "ghub-board-btn",
+      attr: { "aria-label": "切换画布" },
     });
-    this.boardSelEl.addEventListener("change", () => {
-      const v = this.boardSelEl!.value;
-      if (v === "__new__") {
-        const id = this.store.createBoard(`画布 ${Object.keys(this.store.getBoards()).length + 1}`);
-        if (id) this.openBoard(id);
-      } else if (v === "__rename__") {
-        this.renameActiveBoard();
-      } else if (v === "__delete__") {
-        this.deleteActiveBoard();
-      } else {
-        this.openBoard(v);
+    this.boardBtnEl.addEventListener("click", (e) => {
+      const menu = new Menu();
+      const boards = this.store.getBoards();
+      for (const [id, meta] of Object.entries(boards)) {
+        menu.addItem((mi) =>
+          mi
+            .setTitle(meta.name)
+            .setIcon(id === this.activeBoardId ? "check" : "frame")
+            .onClick(() => this.openBoard(id))
+        );
       }
+      menu.addSeparator();
+      menu.addItem((mi) =>
+        mi.setTitle("新建画布").setIcon("plus").onClick(() => {
+          const id = this.store.createBoard(
+            `画布 ${Object.keys(this.store.getBoards()).length + 1}`
+          );
+          if (id) this.openBoard(id);
+        })
+      );
+      menu.addItem((mi) =>
+        mi.setTitle("重命名当前画布").setIcon("pencil").onClick(() => {
+          this.renameActiveBoard();
+        })
+      );
+      if (Object.keys(boards).length > 1) {
+        menu.addItem((mi) =>
+          mi.setTitle("删除当前画布").setIcon("trash-2").onClick(() => {
+            this.deleteActiveBoard();
+          })
+        );
+      }
+      menu.showAtMouseEvent(e as MouseEvent);
     });
 
     const search = bar.createEl("input", {
@@ -327,27 +348,25 @@ export class GalleryView extends ItemView {
     this.contentEl.toggleClass("ghub-mode-canvas", isCanvas);
     this.modeBtns?.grid.toggleClass("is-active", !isCanvas);
     this.modeBtns?.canvas.toggleClass("is-active", isCanvas);
-    if (this.boardSelEl) this.boardSelEl.style.display = isCanvas ? "" : "none";
+    if (this.boardBtnEl)
+      this.boardBtnEl.style.display = isCanvas ? "" : "none";
     if (this.searchEl) this.searchEl.style.display = isCanvas ? "none" : "";
     if (this.sortSelEl) this.sortSelEl.style.display = isCanvas ? "none" : "";
     this.refreshBoardSelect();
   }
 
   private refreshBoardSelect(): void {
-    const sel = this.boardSelEl;
-    if (!sel) return;
-    sel.empty();
-    const boards = this.store.getBoards();
-    for (const [id, meta] of Object.entries(boards)) {
-      sel.createEl("option", { text: `▦ ${meta.name}`, attr: { value: id } });
-    }
-    sel.createEl("option", { text: "＋ 新建画布", attr: { value: "__new__" } });
-    sel.createEl("option", { text: "✎ 重命名当前画布", attr: { value: "__rename__" } });
-    if (Object.keys(boards).length > 1) {
-      sel.createEl("option", { text: "✕ 删除当前画布", attr: { value: "__delete__" } });
-    }
-    if (this.activeBoardId && boards[this.activeBoardId])
-      sel.value = this.activeBoardId;
+    const btn = this.boardBtnEl;
+    if (!btn) return;
+    btn.empty();
+    const ic = btn.createSpan({ cls: "ghub-board-btn-ic" });
+    setIcon(ic, "frame");
+    const name = this.activeBoardId
+      ? this.store.getBoards()[this.activeBoardId]?.name ?? "画布"
+      : "画布";
+    btn.createSpan({ text: name, cls: "ghub-board-btn-t" });
+    const chev = btn.createSpan({ cls: "ghub-board-btn-ic" });
+    setIcon(chev, "chevron-down");
   }
 
   private openBoard(id: string): void {
@@ -358,7 +377,8 @@ export class GalleryView extends ItemView {
       this.store,
       id,
       this.canvasHostEl,
-      () => this.getTheme()
+      () => this.getTheme(),
+      this.importer
     );
     this.refreshBoardSelect();
     this.countEl.setText(
