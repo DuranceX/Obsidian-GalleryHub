@@ -103,13 +103,6 @@ src/
 └── types.ts      data contracts and defaults
 ```
 
-## Roadmap
-
-- [x] **V1** Gallery MVP: masonry, filter & search, detail editing, import
-- [x] **V2** Infinite canvas: multi-board, text/frame annotations, send-to-board
-- [ ] **V3** Automation: auto-extract embedded generation params from PNGs (A1111/ComfyUI), hash dedupe, Markdown gallery export
-- [ ] **V4+** Mobile polish, JPEG/XMP metadata, note linking, community store release
-
 ## License
 
 MIT © [DuranceX](https://github.com/DuranceX)

@@ -102,13 +102,6 @@ src/
 └── types.ts      数据契约与默认值
 ```
 
-## 路线图
-
-- [x] **V1** 画廊 MVP:瀑布流、筛选搜索、详情编辑、导入
-- [x] **V2** 无限画布:多画布、文字/画框标注、发送到画布
-- [ ] **V3** 自动化:PNG 内嵌生成参数自动提取(A1111/ComfyUI)、哈希去重、Markdown 图集导出
-- [ ] **V4+** 移动端打磨、JPEG/XMP 元数据、笔记关联、社区市场上架
-
 ## License
 
 MIT © [DuranceX](https://github.com/DuranceX)
