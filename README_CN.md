@@ -4,7 +4,17 @@
 
 > Obsidian 美术资产画廊插件 —— 统一管理图片、视频、音频、链接与 AI 生图 prompt 元数据,瀑布流画廊 + 无限画布策展,数据 100% 留在本地仓库。
 
-![version](https://img.shields.io/badge/version-0.9.3-e8b04b) ![obsidian](https://img.shields.io/badge/Obsidian-%E2%89%A51.5.0-8b6cef) ![license](https://img.shields.io/badge/license-MIT-green)
+![version](https://img.shields.io/badge/version-0.11.2-e8b04b) ![obsidian](https://img.shields.io/badge/Obsidian-%E2%89%A51.5.0-8b6cef) ![license](https://img.shields.io/badge/license-MIT-green)
+
+## 预览
+
+**画廊** —— 瀑布流浏览 + 侧边栏筛选(暗色 / 浅色):
+
+![画廊预览](docs/screenshot/Gallery-split.png)
+
+**画布** —— PureRef 式策展板,支持文字与画框标注:
+
+![画布预览](docs/screenshot/Canvas-split.png)
 
 ## 为什么做这个
 

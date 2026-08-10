@@ -4,4 +4,9 @@ dist/
 .env
 .DS_Store
 Thumbs.db
-docs/
+# docs 不进版本库,但 README 引用的预览图除外
+docs/*
+!docs/screenshot/
+docs/screenshot/*
+!docs/screenshot/Gallery-split.png
+!docs/screenshot/Canvas-split.png
