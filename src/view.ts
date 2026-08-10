@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
+import { ItemView, WorkspaceLeaf, Notice, setIcon } from "obsidian";
 import { GalleryStore } from "./store";
 import { Importer } from "./importer";
 import { GalleryItem, ItemType } from "./types";
@@ -122,23 +122,31 @@ export class GalleryView extends ItemView {
 
     bar.createDiv({ cls: "ghub-spacer" });
 
-    const importBtn = bar.createEl("button", { text: "＋ 导入文件" });
-    importBtn.addEventListener("click", () => {
-      const input = createEl("input", {
-        attr: { type: "file", multiple: "true", accept: "image/*,video/*" },
-      });
-      input.addEventListener("change", () => {
-        if (input.files?.length) void this.importer.importFiles(input.files);
-      });
-      input.click();
+    const importBtn = bar.createEl("button", {
+      text: "＋ 导入文件",
+      attr: { "aria-label": "从系统选择图片或视频导入" },
     });
+    importBtn.addEventListener("click", () => this.pickFiles());
 
-    const linkBtn = bar.createEl("button", { text: "＋ 链接" });
+    const linkBtn = bar.createEl("button", {
+      text: "＋ 链接",
+      attr: { "aria-label": "添加外部链接" },
+    });
     linkBtn.addEventListener("click", () => {
       new AddLinkModal(this.app, (url, title) => {
         if (this.importer.addLink(url, title)) new Notice("链接已添加");
       }).open();
     });
+  }
+
+  private pickFiles(): void {
+    const input = createEl("input", {
+      attr: { type: "file", multiple: "true", accept: "image/*,video/*" },
+    });
+    input.addEventListener("change", () => {
+      if (input.files?.length) void this.importer.importFiles(input.files);
+    });
+    input.click();
   }
 
   // ---------- 侧边栏 ----------
@@ -150,14 +158,14 @@ export class GalleryView extends ItemView {
 
     // 类型
     side.createEl("h3", { text: "类型" });
-    const typeDefs: Array<[ItemType | "all", string, number]> = [
-      ["all", "全部资产", all.length],
-      ["image", "🖼 图片", all.filter((i) => i.type === "image").length],
-      ["video", "🎬 视频", all.filter((i) => i.type === "video").length],
-      ["link", "🔗 链接", all.filter((i) => i.type === "link").length],
+    const typeDefs: Array<[ItemType | "all", string, string, number]> = [
+      ["all", "layers", "全部资产", all.length],
+      ["image", "image", "图片", all.filter((i) => i.type === "image").length],
+      ["video", "film", "视频", all.filter((i) => i.type === "video").length],
+      ["link", "link", "链接", all.filter((i) => i.type === "link").length],
     ];
-    for (const [val, label, n] of typeDefs) {
-      this.fitem(side, label, n, this.filter.type === val, () => {
+    for (const [val, icon, label, n] of typeDefs) {
+      this.fitem(side, icon, label, n, this.filter.type === val, () => {
         this.filter.type = val;
         this.render();
       });
@@ -172,7 +180,7 @@ export class GalleryView extends ItemView {
       ["unrated", "未评分", all.filter((i) => i.rating === 0).length],
     ];
     for (const [val, label, n] of rateDefs) {
-      this.fitem(side, label, n, this.filter.rating === val, () => {
+      this.fitem(side, null, label, n, this.filter.rating === val, () => {
         this.filter.rating = val;
         this.render();
       });
@@ -216,6 +224,7 @@ export class GalleryView extends ItemView {
 
   private fitem(
     parent: HTMLElement,
+    icon: string | null,
     label: string,
     count: number,
     active: boolean,
@@ -223,10 +232,22 @@ export class GalleryView extends ItemView {
   ): void {
     const el = parent.createDiv({
       cls: "ghub-fitem" + (active ? " is-active" : ""),
+      attr: { role: "button", tabindex: "0", "aria-pressed": String(active) },
     });
-    el.createSpan({ text: label });
+    const left = el.createSpan({ cls: "ghub-fitem-label" });
+    if (icon) {
+      const ic = left.createSpan({ cls: "ghub-ficon" });
+      setIcon(ic, icon);
+    }
+    left.createSpan({ text: label });
     el.createSpan({ cls: "ghub-n", text: String(count) });
     el.addEventListener("click", onClick);
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onClick();
+      }
+    });
   }
 
   // ---------- 渲染 ----------
@@ -269,11 +290,27 @@ export class GalleryView extends ItemView {
 
     if (!items.length) {
       const empty = this.gridEl.createDiv({ cls: "ghub-empty" });
-      empty.setText(
-        this.store.getItems().length === 0
-          ? "库是空的。点击「＋ 导入文件」或直接把图片/视频拖进来。"
-          : "没有符合筛选条件的资产。"
-      );
+      if (this.store.getItems().length === 0) {
+        const ic = empty.createDiv({ cls: "ghub-empty-icon" });
+        setIcon(ic, "image-plus");
+        empty.createDiv({ text: "库是空的" });
+        empty.createDiv({
+          cls: "ghub-empty-hint",
+          text: "点击右上角「＋ 导入文件」,或直接把图片/视频拖进本窗口",
+        });
+        const btn = empty.createEl("button", {
+          text: "导入第一批资产",
+          cls: "mod-cta",
+        });
+        btn.addEventListener("click", () => this.pickFiles());
+      } else {
+        empty.createDiv({ text: "没有符合筛选条件的资产" });
+        const btn = empty.createEl("button", { text: "清除全部筛选" });
+        btn.addEventListener("click", () => {
+          this.filter = { search: "", type: "all", tags: new Set(), rating: "all" };
+          this.render();
+        });
+      }
       return;
     }
 
@@ -286,8 +323,18 @@ export class GalleryView extends ItemView {
     const card = createDiv({ cls: "ghub-card", attr: { tabindex: "0" } });
 
     const thumb = card.createDiv({ cls: "ghub-thumb" });
+    // CLS 防护:已知尺寸时用 aspect-ratio 预留空间
+    if (it.w && it.h) {
+      thumb.style.aspectRatio = `${it.w} / ${it.h}`;
+    }
     if (it.type === "image" && it.path) {
-      const img = thumb.createEl("img", { attr: { loading: "lazy" } });
+      const img = thumb.createEl("img", {
+        attr: { loading: "lazy", alt: it.title || it.fileName || "图片资产" },
+      });
+      if (it.w && it.h) {
+        img.width = it.w;
+        img.height = it.h;
+      }
       img.dataset.src = this.app.vault.adapter.getResourcePath(it.path);
       this.observer?.observe(img);
     } else if (it.type === "video" && it.path) {
@@ -304,7 +351,8 @@ export class GalleryView extends ItemView {
       card.addEventListener("mouseleave", () => video.pause());
     } else if (it.type === "link") {
       const box = thumb.createDiv({ cls: "ghub-linkbox" });
-      box.createDiv({ cls: "ghub-linkbox-icon", text: "🔗" });
+      const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
+      setIcon(ic, "link");
       try {
         box.createDiv({
           cls: "ghub-linkbox-domain",

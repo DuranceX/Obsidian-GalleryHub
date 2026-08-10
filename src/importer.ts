@@ -7,6 +7,20 @@ import {
   typeFromExt,
 } from "./types";
 
+/** 从二进制数据读取图片像素尺寸(失败返回 null,不阻塞导入) */
+async function probeImageSize(
+  buf: ArrayBuffer
+): Promise<{ w: number; h: number } | null> {
+  try {
+    const bmp = await createImageBitmap(new Blob([buf]));
+    const size = { w: bmp.width, h: bmp.height };
+    bmp.close();
+    return size;
+  } catch {
+    return null;
+  }
+}
+
 /** 导入外部文件(File 对象,来自 <input type=file> 或拖拽)到 assets/ 并入库 */
 export class Importer {
   constructor(private app: App, private store: GalleryStore) {}
@@ -45,6 +59,7 @@ export class Importer {
     const dest = normalizePath(`${dir}/${id}.${ext.toLowerCase()}`);
     const buf = await file.arrayBuffer();
     await ad.writeBinary(dest, buf);
+    const size = type === "image" ? await probeImageSize(buf) : null;
 
     const now = new Date().toISOString();
     const item: GalleryItem = {
@@ -55,6 +70,8 @@ export class Importer {
       path: dest,
       fileName: file.name,
       hash: null,
+      w: size?.w,
+      h: size?.h,
       title: file.name.replace(/\.[^.]+$/, ""),
       note: "",
       tags: [],
@@ -84,6 +101,15 @@ export class Importer {
     }
     const now = new Date().toISOString();
     const name = vaultPath.split("/").pop() ?? vaultPath;
+    let size: { w: number; h: number } | null = null;
+    if (type === "image") {
+      try {
+        const buf = await this.app.vault.adapter.readBinary(vaultPath);
+        size = await probeImageSize(buf);
+      } catch {
+        /* ignore */
+      }
+    }
     this.store.addItem({
       id: newId(),
       type,
@@ -92,6 +118,8 @@ export class Importer {
       path: vaultPath,
       fileName: name,
       hash: null,
+      w: size?.w,
+      h: size?.h,
       title: name.replace(/\.[^.]+$/, ""),
       note: "",
       tags: [],

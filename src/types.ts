@@ -34,6 +34,9 @@ export interface GalleryItem {
   /** 导入前原始文件名 */
   fileName?: string;
   hash?: string | null;
+  /** 原始像素尺寸(导入时捕获,用于瀑布流预留空间防 CLS) */
+  w?: number;
+  h?: number;
   title: string;
   note: string;
   tags: string[];
