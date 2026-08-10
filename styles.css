@@ -825,7 +825,7 @@
 }
 
 .ghub-sec:has(.ghub-sec-body.is-collapsed) {
-  padding-bottom: 2px;
+  padding: 10px 12px;
 }
 
 .ghub-sec:has(.ghub-sec-body.is-collapsed) .ghub-sec-head {
