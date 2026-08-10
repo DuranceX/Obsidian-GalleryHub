@@ -5,12 +5,23 @@ export type ItemType = "image" | "video" | "link";
 /** 插件颜色模式 */
 export type ColorMode = "light" | "dark" | "follow";
 
+/** 画廊排序方式(页面内选择,非设置项) */
+export type SortMode =
+  | "created-desc"
+  | "created-asc"
+  | "title-asc"
+  | "rating-desc"
+  | "type";
+
 export interface GalleryHubSettings {
   colorMode: ColorMode;
+  /** 打开画廊时默认进入的文件夹(assets 相对路径,"" = 全部) */
+  defaultFolder: string;
 }
 
 export const DEFAULT_SETTINGS: GalleryHubSettings = {
   colorMode: "dark",
+  defaultFolder: "",
 };
 
 export interface GenMeta {

@@ -308,27 +308,41 @@ export class ConfirmDeleteModal extends Modal {
     app: App,
     private themeClass: string,
     private count: number,
-    private onConfirm: (alsoTrashFiles: boolean) => void
+    private onConfirm: (alsoTrashFiles: boolean) => void,
+    private titleText?: string,
+    private descText?: string,
+    /** 文件夹删除等场景只有"删除"一种强度 */
+    private simpleMode = false
   ) {
     super(app);
+    // 传入自定义标题时默认走单按钮模式
+    this.simpleMode = simpleMode || !!titleText;
   }
 
   onOpen(): void {
     this.modalEl.addClass("ghub-detail-modal", "ghub-addlink", this.themeClass);
     const bar = this.contentEl.createDiv({ cls: "ghub-panelbar" });
-    bar.createEl("h3", { text: `删除 ${this.count} 个资产?` });
+    bar.createEl("h3", {
+      text: this.titleText ?? `删除 ${this.count} 个资产?`,
+    });
     bar.createDiv({
       cls: "ghub-side-empty",
-      text: "「仅移出库」保留原文件;「删除文件」将文件移入系统回收站。",
+      text:
+        this.descText ??
+        "「仅移出库」保留原文件;「删除文件」将文件移入系统回收站。",
     });
     const actions = bar.createDiv({ cls: "ghub-actions" });
-    const a = actions.createEl("button", { text: "仅移出库(保留文件)" });
-    a.addEventListener("click", () => {
-      this.onConfirm(false);
-      this.close();
-    });
+    if (!this.simpleMode) {
+      const a = actions.createEl("button", { text: "仅移出库(保留文件)" });
+      a.addEventListener("click", () => {
+        this.onConfirm(false);
+        this.close();
+      });
+    }
     const b = actions.createEl("button", {
-      text: "移出库并删除文件(可从回收站恢复)",
+      text: this.simpleMode
+        ? "确认删除(可从回收站恢复)"
+        : "移出库并删除文件(可从回收站恢复)",
       cls: "ghub-danger",
     });
     b.addEventListener("click", () => {

@@ -1,4 +1,4 @@
-import { App, Notice, TFile, normalizePath } from "obsidian";
+import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
 import { GalleryStore, ASSETS_DIR } from "./store";
 import {
   GalleryItem,
@@ -162,43 +162,66 @@ export class Importer {
     return true;
   }
 
-  // ================= 文件夹管理(assets/ 子目录 ↔ Hub 文件夹) =================
+  // ================= 文件夹管理(assets/ 目录树 ↔ Hub 文件树) =================
+  // 全部使用 assets/ 相对路径("角色/机甲"),"" 表示 assets 根
 
-  /** 列出 assets/ 下所有子文件夹名 */
+  /** 递归列出 assets/ 下全部子文件夹(相对路径,含嵌套),按路径排序 */
   async listFolders(): Promise<string[]> {
+    const result: string[] = [];
+    const root = this.app.vault.getAbstractFileByPath(normalizePath(ASSETS_DIR));
+    const walk = (folder: TFolder) => {
+      for (const child of folder.children) {
+        if (child instanceof TFolder) {
+          result.push(child.path.slice(ASSETS_DIR.length + 1));
+          walk(child);
+        }
+      }
+    };
+    if (root instanceof TFolder) walk(root);
+    return result.sort((a, b) => a.localeCompare(b, "zh"));
+  }
+
+  /**
+   * 在 parent(assets 相对路径,"" 为根)下创建"新建文件夹"式的唯一名子目录。
+   * 返回新文件夹的相对路径,失败返回 null。
+   */
+  async createFolderIn(parent: string): Promise<string | null> {
     const ad = this.app.vault.adapter;
+    const base = parent ? `${parent}/` : "";
+    let name = "新建文件夹";
+    let rel = `${base}${name}`;
+    let i = 2;
+    while (await ad.exists(normalizePath(`${ASSETS_DIR}/${rel}`))) {
+      name = `新建文件夹 ${i++}`;
+      rel = `${base}${name}`;
+      if (i > 99) return null;
+    }
     try {
-      const listing = await ad.list(normalizePath(ASSETS_DIR));
-      return listing.folders
-        .map((f) => f.split("/").pop() ?? "")
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b, "zh"));
-    } catch {
-      return [];
+      await ad.mkdir(normalizePath(`${ASSETS_DIR}/${rel}`));
+      return rel;
+    } catch (e) {
+      new Notice(`创建失败:${(e as Error).message}`);
+      return null;
     }
   }
 
-  /** 在 assets/ 下创建子文件夹 */
-  async createFolder(name: string): Promise<boolean> {
-    const clean = name.trim();
-    if (!this.validFolderName(clean)) return false;
+  /** 确保文件夹存在(rel 为 assets 相对路径,支持多级) */
+  async createFolderIfMissing(rel: string): Promise<boolean> {
+    const clean = rel.trim().replace(/^\/+|\/+$/g, "");
+    if (!clean) return true;
+    if (clean.split("/").some((seg) => !this.validFolderName(seg))) return false;
     const dir = normalizePath(`${ASSETS_DIR}/${clean}`);
     const ad = this.app.vault.adapter;
-    if (await ad.exists(dir)) {
-      new Notice("同名文件夹已存在");
-      return false;
+    if (!(await ad.exists(dir))) {
+      // 逐级创建
+      const parts = clean.split("/");
+      let cur = ASSETS_DIR;
+      for (const p of parts) {
+        cur = `${cur}/${p}`;
+        if (!(await ad.exists(normalizePath(cur))))
+          await ad.mkdir(normalizePath(cur));
+      }
     }
-    await ad.mkdir(dir);
-    return true;
-  }
-
-  /** 确保文件夹存在(选择已有文件夹或新建均可走此入口) */
-  async createFolderIfMissing(name: string): Promise<boolean> {
-    const clean = name.trim();
-    if (!this.validFolderName(clean)) return false;
-    const dir = normalizePath(`${ASSETS_DIR}/${clean}`);
-    const ad = this.app.vault.adapter;
-    if (!(await ad.exists(dir))) await ad.mkdir(dir);
     return true;
   }
 
@@ -210,24 +233,105 @@ export class Importer {
     return true;
   }
 
-  /** 条目所属文件夹(assets/<folder>/file → folder;库外文件/链接 → null) */
+  /** 重命名文件夹(rel → 同级 newName),同步更新库内所有条目 path */
+  async renameFolder(rel: string, newName: string): Promise<string | null> {
+    const clean = newName.trim();
+    if (!this.validFolderName(clean)) return null;
+    const parent = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "";
+    const newRel = parent ? `${parent}/${clean}` : clean;
+    if (newRel === rel) return rel;
+    return this.moveFolderTo(rel, newRel);
+  }
+
+  /** 移动文件夹到另一文件夹之下(dstParent 为 assets 相对路径或 "") */
+  async moveFolder(rel: string, dstParent: string): Promise<string | null> {
+    const name = rel.split("/").pop()!;
+    const newRel = dstParent ? `${dstParent}/${name}` : name;
+    if (newRel === rel) return rel;
+    // 禁止移动到自己内部
+    if (dstParent === rel || dstParent.startsWith(`${rel}/`)) {
+      new Notice("不能把文件夹移动到它自己内部");
+      return null;
+    }
+    return this.moveFolderTo(rel, newRel);
+  }
+
+  private async moveFolderTo(rel: string, newRel: string): Promise<string | null> {
+    const oldPath = normalizePath(`${ASSETS_DIR}/${rel}`);
+    const newPath = normalizePath(`${ASSETS_DIR}/${newRel}`);
+    const f = this.app.vault.getAbstractFileByPath(oldPath);
+    if (!(f instanceof TFolder)) {
+      new Notice(`找不到文件夹:${rel}`);
+      return null;
+    }
+    if (this.app.vault.getAbstractFileByPath(newPath)) {
+      new Notice("目标位置已存在同名文件夹");
+      return null;
+    }
+    try {
+      await this.app.fileManager.renameFile(f as TAbstractFile, newPath);
+    } catch (e) {
+      new Notice(`操作失败:${(e as Error).message}`);
+      return null;
+    }
+    // 同步库内路径前缀
+    const oldPrefix = `${oldPath}/`;
+    for (const it of this.store.getItems()) {
+      if (it.path?.startsWith(oldPrefix)) {
+        this.store.updateItem(it.id, {
+          path: `${newPath}/${it.path.slice(oldPrefix.length)}`,
+        });
+      }
+    }
+    return newRel;
+  }
+
+  /**
+   * 删除文件夹(递归,进系统回收站),库内该目录下条目一并移除。
+   * 返回受影响条目数,失败返回 null。
+   */
+  async deleteFolder(rel: string): Promise<number | null> {
+    const path = normalizePath(`${ASSETS_DIR}/${rel}`);
+    const f = this.app.vault.getAbstractFileByPath(path);
+    if (!(f instanceof TFolder)) {
+      new Notice(`找不到文件夹:${rel}`);
+      return null;
+    }
+    const prefix = `${path}/`;
+    const doomed = this.store
+      .getItems()
+      .filter((it) => it.path?.startsWith(prefix))
+      .map((it) => it.id);
+    try {
+      await this.app.vault.trash(f, true);
+    } catch (e) {
+      new Notice(`删除失败:${(e as Error).message}`);
+      return null;
+    }
+    this.store.deleteItems(doomed);
+    return doomed.length;
+  }
+
+  /** 条目所属文件夹:assets 相对路径("角色/机甲"),根下直存文件与库外/链接 → null */
   folderOf(item: GalleryItem): string | null {
     if (!item.path) return null;
     const prefix = `${ASSETS_DIR}/`;
     if (!item.path.startsWith(prefix)) return null;
     const rest = item.path.slice(prefix.length);
-    const idx = rest.indexOf("/");
+    const idx = rest.lastIndexOf("/");
     return idx > 0 ? rest.slice(0, idx) : null;
   }
 
   /**
-   * 批量移动条目到 assets/<folder>/。
+   * 批量移动条目到 assets/<folder>/(folder 为相对路径,"" 表示根)。
    * 移动物理文件(FileManager 保持链接)并更新条目 path,单次刷新。
    */
   async moveItems(items: GalleryItem[], folder: string): Promise<number> {
-    const destDir = normalizePath(`${ASSETS_DIR}/${folder}`);
+    const destDir = normalizePath(
+      folder ? `${ASSETS_DIR}/${folder}` : ASSETS_DIR
+    );
     const ad = this.app.vault.adapter;
-    if (!(await ad.exists(destDir))) await ad.mkdir(destDir);
+    if (!(await ad.exists(destDir))) await this.createFolderIfMissing(folder);
 
     let moved = 0;
     for (const it of items) {
@@ -252,7 +356,7 @@ export class Importer {
         new Notice(`移动 ${fileName} 失败:${(e as Error).message}`, 6000);
       }
     }
-    if (moved) new Notice(`已移动 ${moved} 个资产到「${folder}」`);
+    if (moved) new Notice(`已移动 ${moved} 个资产到「${folder || "根目录"}」`);
     return moved;
   }
 

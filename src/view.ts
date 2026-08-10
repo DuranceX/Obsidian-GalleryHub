@@ -1,7 +1,7 @@
-import { ItemView, WorkspaceLeaf, Notice, setIcon } from "obsidian";
+import { ItemView, WorkspaceLeaf, Menu, Notice, setIcon } from "obsidian";
 import { GalleryStore } from "./store";
 import { Importer } from "./importer";
-import { GalleryItem, ItemType } from "./types";
+import { GalleryItem, ItemType, SortMode } from "./types";
 import {
   DetailModal,
   AddLinkModal,
@@ -18,9 +18,24 @@ interface FilterState {
   type: ItemType | "all";
   tags: Set<string>;
   rating: RatingFilter;
-  /** null = 全部;"" 不用;文件夹名 = assets/<name>/ 下的资产 */
+  /** null = 全部;"" = assets 根直存;其他 = assets 相对路径(含选中文件夹的整棵子树) */
   folder: string | null;
 }
+
+/** 文件树节点 */
+interface TreeNode {
+  name: string;
+  rel: string;
+  children: TreeNode[];
+}
+
+const SORT_OPTIONS: Array<[SortMode, string]> = [
+  ["created-desc", "最新导入"],
+  ["created-asc", "最早导入"],
+  ["title-asc", "标题 A→Z"],
+  ["rating-desc", "评分从高到低"],
+  ["type", "按类型"],
+];
 
 export class GalleryView extends ItemView {
   private store: GalleryStore;
@@ -44,19 +59,36 @@ export class GalleryView extends ItemView {
   private resizeTimer: number | null = null;
   /** 多选:选中的条目 id */
   private selected = new Set<string>();
-  /** assets/ 子文件夹缓存(侧边栏渲染用) */
+  /** assets/ 全部子文件夹(相对路径,含嵌套) */
   private folders: string[] = [];
+  /** 树中已展开的文件夹 */
+  private expanded = new Set<string>();
+  /** 内联重命名中的文件夹(rel);新建后也进入此状态 */
+  private renaming: string | null = null;
+  /** 排序方式(页面内状态) */
+  private sortMode: SortMode = "created-desc";
+  private getDefaultFolder: () => string;
 
   constructor(
     leaf: WorkspaceLeaf,
     store: GalleryStore,
     importer: Importer,
-    getTheme: () => string
+    getTheme: () => string,
+    getDefaultFolder: () => string
   ) {
     super(leaf);
     this.store = store;
     this.importer = importer;
     this.getTheme = getTheme;
+    this.getDefaultFolder = getDefaultFolder;
+    const def = getDefaultFolder();
+    if (def) {
+      this.filter.folder = def;
+      // 默认文件夹的祖先链全部展开
+      const parts = def.split("/");
+      for (let i = 1; i <= parts.length; i++)
+        this.expanded.add(parts.slice(0, i).join("/"));
+    }
   }
 
   /** 切换颜色模式(设置变更/Obsidian 主题变化时由插件调用) */
@@ -182,6 +214,20 @@ export class GalleryView extends ItemView {
     });
 
     this.countEl = bar.createDiv({ cls: "ghub-count" });
+
+    // 排序方式(页面内选项)
+    const sortSel = bar.createEl("select", {
+      cls: "ghub-sort",
+      attr: { "aria-label": "排序方式" },
+    });
+    for (const [val, label] of SORT_OPTIONS) {
+      sortSel.createEl("option", { text: label, attr: { value: val } });
+    }
+    sortSel.value = this.sortMode;
+    sortSel.addEventListener("change", () => {
+      this.sortMode = sortSel.value as SortMode;
+      this.renderGrid();
+    });
 
     bar.createDiv({ cls: "ghub-spacer" });
 
@@ -314,39 +360,34 @@ export class GalleryView extends ItemView {
     side.empty();
     const all = this.store.getItems();
 
-    // 文件夹(assets/ 子目录 ↔ Hub)
+    // 文件夹树(assets/ 目录树 ↔ Hub)
     const head = side.createDiv({ cls: "ghub-side-head" });
     head.createEl("h3", { text: "文件夹" });
     const addBtn = head.createEl("button", {
       cls: "ghub-mini-btn",
-      attr: { "aria-label": "新建文件夹" },
+      attr: { "aria-label": "在根目录新建文件夹" },
     });
     setIcon(addBtn, "folder-plus");
-    addBtn.addEventListener("click", () => {
-      new FolderPickModal(
-        this.app,
-        this.getTheme(),
-        [],
-        "新建文件夹",
-        (name) => {
-          void this.importer.createFolder(name).then((ok) => {
-            if (ok) void this.refreshFolders();
-          });
-        }
-      ).open();
-    });
+    addBtn.addEventListener("click", () => void this.quickCreateFolder(""));
 
-    this.fitem(side, "layers", "全部", all.length, this.filter.folder === null, () => {
-      this.filter.folder = null;
-      this.render();
-    });
-    for (const f of this.folders) {
-      const n = all.filter((it) => this.importer.folderOf(it) === f).length;
-      this.fitem(side, "folder", f, n, this.filter.folder === f, () => {
-        this.filter.folder = this.filter.folder === f ? null : f;
+    // "全部" 根节点(也是"移到根"的拖放目标)
+    const allRow = this.fitem(
+      side,
+      "layers",
+      "全部",
+      all.length,
+      this.filter.folder === null,
+      () => {
+        this.filter.folder = null;
         this.render();
-      });
-    }
+      }
+    );
+    this.makeDropTarget(allRow, "");
+
+    // 树渲染
+    const tree = this.buildTree();
+    const treeEl = side.createDiv({ cls: "ghub-tree" });
+    for (const node of tree) this.renderTreeNode(treeEl, node, 0);
 
     // 类型
     side.createEl("h3", { text: "类型" });
@@ -421,7 +462,7 @@ export class GalleryView extends ItemView {
     count: number,
     active: boolean,
     onClick: () => void
-  ): void {
+  ): HTMLElement {
     const el = parent.createDiv({
       cls: "ghub-fitem" + (active ? " is-active" : ""),
       attr: { role: "button", tabindex: "0", "aria-pressed": String(active) },
@@ -438,6 +479,253 @@ export class GalleryView extends ItemView {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         onClick();
+      }
+    });
+    return el;
+  }
+
+  // ---------- 文件树 ----------
+
+  /** folders(相对路径列表)→ 嵌套树 */
+  private buildTree(): TreeNode[] {
+    const roots: TreeNode[] = [];
+    const map = new Map<string, TreeNode>();
+    for (const rel of this.folders) {
+      const name = rel.split("/").pop()!;
+      const node: TreeNode = { name, rel, children: [] };
+      map.set(rel, node);
+      const parent = rel.includes("/")
+        ? map.get(rel.slice(0, rel.lastIndexOf("/")))
+        : null;
+      if (parent) parent.children.push(node);
+      else if (!rel.includes("/")) roots.push(node);
+    }
+    return roots;
+  }
+
+  /** 该文件夹(含子树)内的资产数 */
+  private countInFolder(rel: string): number {
+    return this.store.getItems().filter((it) => {
+      const f = this.importer.folderOf(it);
+      return f !== null && (f === rel || f.startsWith(`${rel}/`));
+    }).length;
+  }
+
+  private renderTreeNode(
+    parent: HTMLElement,
+    node: TreeNode,
+    depth: number
+  ): void {
+    const hasChildren = node.children.length > 0;
+    const isExpanded = this.expanded.has(node.rel);
+    const active = this.filter.folder === node.rel;
+
+    const row = parent.createDiv({
+      cls: "ghub-fitem ghub-tree-row" + (active ? " is-active" : ""),
+      attr: { role: "button", tabindex: "0", "aria-pressed": String(active) },
+    });
+    row.style.paddingLeft = `${9 + depth * 14}px`;
+
+    // 展开箭头
+    const arrow = row.createSpan({ cls: "ghub-tree-arrow" });
+    if (hasChildren) {
+      setIcon(arrow, isExpanded ? "chevron-down" : "chevron-right");
+      arrow.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (isExpanded) this.expanded.delete(node.rel);
+        else this.expanded.add(node.rel);
+        this.renderSidebar();
+      });
+    }
+
+    const left = row.createSpan({ cls: "ghub-fitem-label" });
+    const ic = left.createSpan({ cls: "ghub-ficon" });
+    setIcon(ic, isExpanded && hasChildren ? "folder-open" : "folder");
+
+    // 内联重命名
+    if (this.renaming === node.rel) {
+      const input = left.createEl("input", {
+        cls: "ghub-rename-input",
+        attr: { type: "text" },
+      });
+      input.value = node.name;
+      input.addEventListener("click", (e) => e.stopPropagation());
+      const commit = async () => {
+        this.renaming = null;
+        const name = input.value.trim();
+        if (!name || name === node.name) {
+          this.renderSidebar();
+          return;
+        }
+        const newRel = await this.importer.renameFolder(node.rel, name);
+        if (newRel) this.remapAfterFolderChange(node.rel, newRel);
+        await this.refreshFolders();
+        this.renderGrid();
+      };
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") void commit();
+        if (e.key === "Escape") {
+          this.renaming = null;
+          this.renderSidebar();
+        }
+      });
+      input.addEventListener("blur", () => void commit());
+      window.setTimeout(() => {
+        input.focus();
+        input.select();
+      }, 0);
+    } else {
+      left.createSpan({ text: node.name });
+    }
+
+    row.createSpan({
+      cls: "ghub-n",
+      text: String(this.countInFolder(node.rel)),
+    });
+
+    // 点击筛选
+    row.addEventListener("click", () => {
+      if (this.renaming) return;
+      this.filter.folder = active ? null : node.rel;
+      this.render();
+    });
+    row.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        this.filter.folder = active ? null : node.rel;
+        this.render();
+      }
+      if (e.key === "F2") {
+        this.renaming = node.rel;
+        this.renderSidebar();
+      }
+    });
+
+    // 右键菜单
+    row.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      const menu = new Menu();
+      menu.addItem((mi) =>
+        mi
+          .setTitle("新建子文件夹")
+          .setIcon("folder-plus")
+          .onClick(() => void this.quickCreateFolder(node.rel))
+      );
+      menu.addItem((mi) =>
+        mi
+          .setTitle("重命名")
+          .setIcon("pencil")
+          .onClick(() => {
+            this.renaming = node.rel;
+            this.renderSidebar();
+          })
+      );
+      menu.addSeparator();
+      menu.addItem((mi) =>
+        mi
+          .setTitle("删除(文件进回收站)")
+          .setIcon("trash-2")
+          .onClick(() => {
+            const n = this.countInFolder(node.rel);
+            new ConfirmDeleteModal(
+              this.app,
+              this.getTheme(),
+              n,
+              () => {
+                void this.importer.deleteFolder(node.rel).then((deleted) => {
+                  if (deleted === null) return;
+                  if (
+                    this.filter.folder === node.rel ||
+                    this.filter.folder?.startsWith(`${node.rel}/`)
+                  )
+                    this.filter.folder = null;
+                  void this.refreshFolders().then(() => this.renderGrid());
+                });
+              },
+              `删除文件夹「${node.name}」?`,
+              `将删除该文件夹及其中 ${n} 个已入库资产(文件进系统回收站)。`
+            ).open();
+          })
+      );
+      menu.showAtMouseEvent(e);
+    });
+
+    // 拖拽:文件夹自身可拖;也可作为放置目标(接受文件夹/卡片/系统文件)
+    row.draggable = true;
+    row.addEventListener("dragstart", (e) => {
+      e.dataTransfer?.setData("application/ghub-folder", node.rel);
+      e.stopPropagation();
+    });
+    this.makeDropTarget(row, node.rel);
+
+    if (hasChildren && isExpanded) {
+      for (const child of node.children)
+        this.renderTreeNode(parent, child, depth + 1);
+    }
+  }
+
+  /** 同级快速新建:直接创建"新建文件夹 N"并进入内联重命名 */
+  private async quickCreateFolder(parent: string): Promise<void> {
+    const rel = await this.importer.createFolderIn(parent);
+    if (!rel) return;
+    if (parent) this.expanded.add(parent);
+    this.renaming = rel;
+    await this.refreshFolders();
+  }
+
+  /** 文件夹改名/移动后同步筛选状态与展开状态 */
+  private remapAfterFolderChange(oldRel: string, newRel: string): void {
+    const remap = (v: string) =>
+      v === oldRel
+        ? newRel
+        : v.startsWith(`${oldRel}/`)
+          ? `${newRel}${v.slice(oldRel.length)}`
+          : v;
+    if (this.filter.folder) this.filter.folder = remap(this.filter.folder);
+    this.expanded = new Set([...this.expanded].map(remap));
+  }
+
+  /** 使元素成为放置目标:接受文件夹移动、卡片移动、系统文件导入 */
+  private makeDropTarget(el: HTMLElement, rel: string): void {
+    el.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      el.addClass("ghub-drop-hover");
+    });
+    el.addEventListener("dragleave", () => el.removeClass("ghub-drop-hover"));
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      el.removeClass("ghub-drop-hover");
+      const dt = e.dataTransfer;
+      if (!dt) return;
+
+      const folderRel = dt.getData("application/ghub-folder");
+      if (folderRel) {
+        if (folderRel === rel) return;
+        void this.importer.moveFolder(folderRel, rel).then((newRel) => {
+          if (newRel) this.remapAfterFolderChange(folderRel, newRel);
+          void this.refreshFolders().then(() => this.renderGrid());
+        });
+        return;
+      }
+
+      const itemIds = dt.getData("application/ghub-items");
+      if (itemIds) {
+        const items = itemIds
+          .split(",")
+          .map((id) => this.store.getItem(id))
+          .filter((it): it is GalleryItem => !!it && !!it.path);
+        if (items.length)
+          void this.importer.moveItems(items, rel).then(() => {
+            this.clearSelection();
+            this.renderSidebar();
+          });
+        return;
+      }
+
+      if (dt.files?.length) {
+        void this.importer.importFiles(dt.files, rel || undefined);
       }
     });
   }
@@ -457,8 +745,12 @@ export class GalleryView extends ItemView {
   private filtered(): GalleryItem[] {
     const f = this.filter;
     return this.store.getItems().filter((it) => {
-      if (f.folder !== null && this.importer.folderOf(it) !== f.folder)
-        return false;
+      if (f.folder !== null) {
+        const fo = this.importer.folderOf(it);
+        // 选中文件夹时包含其整棵子树
+        if (fo === null || (fo !== f.folder && !fo.startsWith(`${f.folder}/`)))
+          return false;
+      }
       if (f.type !== "all" && it.type !== f.type) return false;
       if (f.rating === "unrated") {
         if (it.rating !== 0) return false;
@@ -525,11 +817,9 @@ export class GalleryView extends ItemView {
       return;
     }
 
-    // JS 瀑布流:新→旧排序,从左到右放入"当前最矮的列"
+    // JS 瀑布流:按 sortMode 排序后,从左到右放入"当前最矮的列"
     // (CSS columns 是竖排+滚动重排,顺序和稳定性都不对,弃用)
-    const sorted = [...items].sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt)
-    );
+    const sorted = this.sortItems(items);
     this.colCount = this.computeColCount();
     const cols: HTMLElement[] = [];
     const heights: number[] = [];
@@ -549,9 +839,48 @@ export class GalleryView extends ItemView {
     }
   }
 
+  private sortItems(items: GalleryItem[]): GalleryItem[] {
+    const arr = [...items];
+    switch (this.sortMode) {
+      case "created-asc":
+        return arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      case "title-asc":
+        return arr.sort(
+          (a, b) =>
+            a.title.localeCompare(b.title, "zh") ||
+            b.createdAt.localeCompare(a.createdAt)
+        );
+      case "rating-desc":
+        return arr.sort(
+          (a, b) =>
+            b.rating - a.rating || b.createdAt.localeCompare(a.createdAt)
+        );
+      case "type": {
+        const order = { image: 0, video: 1, link: 2 };
+        return arr.sort(
+          (a, b) =>
+            order[a.type] - order[b.type] ||
+            b.createdAt.localeCompare(a.createdAt)
+        );
+      }
+      case "created-desc":
+      default:
+        return arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+  }
+
   private card(it: GalleryItem): HTMLElement {
     const card = createDiv({ cls: "ghub-card", attr: { tabindex: "0" } });
     if (this.selected.has(it.id)) card.addClass("is-selected");
+
+    // 卡片可拖到侧边栏文件夹(拖已选中的=整批移动)
+    card.draggable = true;
+    card.addEventListener("dragstart", (e) => {
+      const ids = this.selected.has(it.id)
+        ? [...this.selected]
+        : [it.id];
+      e.dataTransfer?.setData("application/ghub-items", ids.join(","));
+    });
 
     const thumb = card.createDiv({ cls: "ghub-thumb" });
     // CLS 防护:已知尺寸时用 aspect-ratio 预留空间

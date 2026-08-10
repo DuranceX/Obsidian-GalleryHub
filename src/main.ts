@@ -24,8 +24,12 @@ export default class GalleryHubPlugin extends Plugin {
     this.registerView(
       VIEW_TYPE_GALLERY,
       (leaf) =>
-        new GalleryView(leaf, this.store, this.importer, () =>
-          this.themeClass()
+        new GalleryView(
+          leaf,
+          this.store,
+          this.importer,
+          () => this.themeClass(),
+          () => this.settings.defaultFolder
         )
     );
 
@@ -149,6 +153,21 @@ class GalleryHubSettingTab extends PluginSettingTab {
             this.plugin.settings.colorMode = v as GalleryHubSettings["colorMode"];
             await this.plugin.saveSettings();
             this.plugin.applyThemeToViews();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("默认文件夹")
+      .setDesc(
+        "打开画廊时默认进入的文件夹(assets 下的相对路径,如「角色/机甲」;留空为全部)。"
+      )
+      .addText((t) =>
+        t
+          .setPlaceholder("留空 = 全部")
+          .setValue(this.plugin.settings.defaultFolder)
+          .onChange(async (v) => {
+            this.plugin.settings.defaultFolder = v.trim().replace(/^\/+|\/+$/g, "");
+            await this.plugin.saveSettings();
           })
       );
   }
