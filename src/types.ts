@@ -17,11 +17,20 @@ export interface GalleryHubSettings {
   colorMode: ColorMode;
   /** 打开画廊时默认进入的文件夹(assets 相对路径,"" = 全部) */
   defaultFolder: string;
+  /** 侧边栏模块开关 */
+  showFolders: boolean;
+  showTypes: boolean;
+  showRatings: boolean;
+  showTags: boolean;
 }
 
 export const DEFAULT_SETTINGS: GalleryHubSettings = {
   colorMode: "dark",
   defaultFolder: "",
+  showFolders: true,
+  showTypes: true,
+  showRatings: true,
+  showTags: true,
 };
 
 export interface GenMeta {

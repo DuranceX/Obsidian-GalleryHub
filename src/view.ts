@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf, Menu, Notice, setIcon } from "obsidian";
 import { GalleryStore } from "./store";
 import { Importer } from "./importer";
-import { GalleryItem, ItemType, SortMode } from "./types";
+import { GalleryItem, ItemType, SortMode, GalleryHubSettings } from "./types";
 import {
   DetailModal,
   AddLinkModal,
@@ -67,21 +67,21 @@ export class GalleryView extends ItemView {
   private renaming: string | null = null;
   /** 排序方式(页面内状态) */
   private sortMode: SortMode = "created-desc";
-  private getDefaultFolder: () => string;
+  private getSettings: () => GalleryHubSettings;
 
   constructor(
     leaf: WorkspaceLeaf,
     store: GalleryStore,
     importer: Importer,
     getTheme: () => string,
-    getDefaultFolder: () => string
+    getSettings: () => GalleryHubSettings
   ) {
     super(leaf);
     this.store = store;
     this.importer = importer;
     this.getTheme = getTheme;
-    this.getDefaultFolder = getDefaultFolder;
-    const def = getDefaultFolder();
+    this.getSettings = getSettings;
+    const def = getSettings().defaultFolder;
     if (def) {
       this.filter.folder = def;
       // 默认文件夹的祖先链全部展开
@@ -359,100 +359,133 @@ export class GalleryView extends ItemView {
     const side = this.sideEl;
     side.empty();
     const all = this.store.getItems();
+    const cfg = this.getSettings();
 
     // 文件夹树(assets/ 目录树 ↔ Hub)
-    const head = side.createDiv({ cls: "ghub-side-head" });
-    head.createEl("h3", { text: "文件夹" });
-    const addBtn = head.createEl("button", {
-      cls: "ghub-mini-btn",
-      attr: { "aria-label": "在根目录新建文件夹" },
-    });
-    setIcon(addBtn, "folder-plus");
-    addBtn.addEventListener("click", () => void this.quickCreateFolder(""));
+    if (cfg.showFolders) {
+      const head = side.createDiv({ cls: "ghub-side-head" });
+      head.createEl("h3", { text: "文件夹" });
+      const addBtn = head.createEl("button", {
+        cls: "ghub-mini-btn",
+        attr: { "aria-label": "在根目录新建文件夹" },
+      });
+      setIcon(addBtn, "folder-plus");
+      addBtn.addEventListener("click", () => void this.quickCreateFolder(""));
 
-    // "全部" 根节点(也是"移到根"的拖放目标)
-    const allRow = this.fitem(
-      side,
-      "layers",
-      "全部",
-      all.length,
-      this.filter.folder === null,
-      () => {
-        this.filter.folder = null;
-        this.render();
-      }
-    );
-    this.makeDropTarget(allRow, "");
+      // "全部" 根节点(也是"移到根"的拖放目标)
+      const allRow = this.fitem(
+        side,
+        "layers",
+        "全部",
+        all.length,
+        this.filter.folder === null,
+        () => {
+          this.filter.folder = null;
+          this.render();
+        }
+      );
+      this.makeDropTarget(allRow, "");
 
-    // 树渲染
-    const tree = this.buildTree();
-    const treeEl = side.createDiv({ cls: "ghub-tree" });
-    for (const node of tree) this.renderTreeNode(treeEl, node, 0);
+      // 树渲染
+      const tree = this.buildTree();
+      const treeEl = side.createDiv({ cls: "ghub-tree" });
+      for (const node of tree) this.renderTreeNode(treeEl, node, 0);
+    }
 
     // 类型
-    side.createEl("h3", { text: "类型" });
-    const typeDefs: Array<[ItemType | "all", string, string, number]> = [
-      ["all", "layers", "全部资产", all.length],
-      ["image", "image", "图片", all.filter((i) => i.type === "image").length],
-      ["video", "film", "视频", all.filter((i) => i.type === "video").length],
-      ["link", "link", "链接", all.filter((i) => i.type === "link").length],
-    ];
-    for (const [val, icon, label, n] of typeDefs) {
-      this.fitem(side, icon, label, n, this.filter.type === val, () => {
-        this.filter.type = val;
-        this.render();
-      });
+    if (cfg.showTypes) {
+      side.createEl("h3", { text: "类型" });
+      const typeDefs: Array<[ItemType | "all", string, string, number]> = [
+        ["all", "layers", "全部资产", all.length],
+        ["image", "image", "图片", all.filter((i) => i.type === "image").length],
+        ["video", "film", "视频", all.filter((i) => i.type === "video").length],
+        ["link", "link", "链接", all.filter((i) => i.type === "link").length],
+      ];
+      for (const [val, icon, label, n] of typeDefs) {
+        this.fitem(side, icon, label, n, this.filter.type === val, () => {
+          this.filter.type = val;
+          this.render();
+        });
+      }
     }
 
     // 评分
-    side.createEl("h3", { text: "评分" });
-    const rateDefs: Array<[RatingFilter, string, number]> = [
-      ["all", "全部评分", all.length],
-      [5, "★★★★★", all.filter((i) => i.rating === 5).length],
-      [4, "★★★★ 以上", all.filter((i) => i.rating >= 4).length],
-      ["unrated", "未评分", all.filter((i) => i.rating === 0).length],
-    ];
-    for (const [val, label, n] of rateDefs) {
-      this.fitem(side, null, label, n, this.filter.rating === val, () => {
-        this.filter.rating = val;
-        this.render();
-      });
+    if (cfg.showRatings) {
+      side.createEl("h3", { text: "评分" });
+      const rateDefs: Array<[RatingFilter, string, number]> = [
+        ["all", "全部评分", all.length],
+        [5, "★★★★★", all.filter((i) => i.rating === 5).length],
+        [4, "★★★★ 以上", all.filter((i) => i.rating >= 4).length],
+        ["unrated", "未评分", all.filter((i) => i.rating === 0).length],
+      ];
+      for (const [val, label, n] of rateDefs) {
+        this.fitem(side, null, label, n, this.filter.rating === val, () => {
+          this.filter.rating = val;
+          this.render();
+        });
+      }
     }
 
     // 标签云
-    side.createEl("h3", { text: "标签" });
-    const counts = new Map<string, number>();
-    for (const it of all)
-      for (const t of it.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
-    if (!counts.size) {
-      side.createDiv({ cls: "ghub-side-empty", text: "暂无标签" });
-      return;
+    if (cfg.showTags) {
+      side.createEl("h3", { text: "标签" });
+      const counts = new Map<string, number>();
+      for (const it of all)
+        for (const t of it.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+      if (!counts.size) {
+        side.createDiv({ cls: "ghub-side-empty", text: "暂无标签" });
+        return;
+      }
+      const cloud = side.createDiv({ cls: "ghub-tagcloud" });
+      const sorted = [...counts.entries()].sort(
+        (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh")
+      );
+      for (const [tag, n] of sorted) {
+        const chip = cloud.createEl("span", {
+          text: `${tag} ${n}`,
+          cls: "ghub-tag" + (this.filter.tags.has(tag) ? " is-active" : ""),
+        });
+        chip.addEventListener("click", () => {
+          if (this.filter.tags.has(tag)) this.filter.tags.delete(tag);
+          else this.filter.tags.add(tag);
+          this.render();
+        });
+      }
+      if (this.filter.tags.size) {
+        const clear = cloud.createEl("span", {
+          text: "✕ 清除",
+          cls: "ghub-tag",
+        });
+        clear.addEventListener("click", () => {
+          this.filter.tags.clear();
+          this.render();
+        });
+      }
     }
-    const cloud = side.createDiv({ cls: "ghub-tagcloud" });
-    const sorted = [...counts.entries()].sort(
-      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh")
-    );
-    for (const [tag, n] of sorted) {
-      const chip = cloud.createEl("span", {
-        text: `${tag} ${n}`,
-        cls: "ghub-tag" + (this.filter.tags.has(tag) ? " is-active" : ""),
-      });
-      chip.addEventListener("click", () => {
-        if (this.filter.tags.has(tag)) this.filter.tags.delete(tag);
-        else this.filter.tags.add(tag);
-        this.render();
-      });
+  }
+
+  /** 设置变化后由插件调用:重渲染侧边栏(隐藏模块对应的筛选同时复位) */
+  refreshSidebar(): void {
+    const cfg = this.getSettings();
+    let gridDirty = false;
+    if (!cfg.showFolders && this.filter.folder !== null) {
+      this.filter.folder = null;
+      gridDirty = true;
     }
-    if (this.filter.tags.size) {
-      const clear = cloud.createEl("span", {
-        text: "✕ 清除",
-        cls: "ghub-tag",
-      });
-      clear.addEventListener("click", () => {
-        this.filter.tags.clear();
-        this.render();
-      });
+    if (!cfg.showTypes && this.filter.type !== "all") {
+      this.filter.type = "all";
+      gridDirty = true;
     }
+    if (!cfg.showRatings && this.filter.rating !== "all") {
+      this.filter.rating = "all";
+      gridDirty = true;
+    }
+    if (!cfg.showTags && this.filter.tags.size) {
+      this.filter.tags.clear();
+      gridDirty = true;
+    }
+    this.renderSidebar();
+    if (gridDirty) this.renderGrid();
   }
 
   private fitem(

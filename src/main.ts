@@ -29,7 +29,7 @@ export default class GalleryHubPlugin extends Plugin {
           this.store,
           this.importer,
           () => this.themeClass(),
-          () => this.settings.defaultFolder
+          () => this.settings
         )
     );
 
@@ -105,6 +105,14 @@ export default class GalleryHubPlugin extends Plugin {
     }
   }
 
+  /** 侧边栏模块开关变化后刷新所有已打开视图 */
+  refreshViews(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GALLERY)) {
+      const view = leaf.view;
+      if (view instanceof GalleryView) view.refreshSidebar();
+    }
+  }
+
   // ---------- 设置 ----------
 
   async loadSettings(): Promise<void> {
@@ -170,5 +178,28 @@ class GalleryHubSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(containerEl).setName("侧边栏模块").setHeading();
+
+    const moduleToggle = (
+      name: string,
+      desc: string,
+      key: "showFolders" | "showTypes" | "showRatings" | "showTags"
+    ) => {
+      new Setting(containerEl)
+        .setName(name)
+        .setDesc(desc)
+        .addToggle((t) =>
+          t.setValue(this.plugin.settings[key]).onChange(async (v) => {
+            this.plugin.settings[key] = v;
+            await this.plugin.saveSettings();
+            this.plugin.refreshViews();
+          })
+        );
+    };
+    moduleToggle("文件树", "assets 目录树(含新建/重命名/拖拽)", "showFolders");
+    moduleToggle("类型", "全部/图片/视频/链接 筛选", "showTypes");
+    moduleToggle("评分", "按星级筛选", "showRatings");
+    moduleToggle("标签", "标签云筛选", "showTags");
   }
 }
