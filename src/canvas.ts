@@ -4,6 +4,7 @@ import { GalleryItem, LayoutPos, BoardElement, ELEMENT_COLORS } from "./types";
 import { t } from "./i18n";
 import { DetailModal } from "./detail";
 import { Importer } from "./importer";
+import { ThumbCache } from "./thumbs";
 
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 8;
@@ -21,6 +22,7 @@ export class CanvasBoard {
   private boardId: string;
   private getTheme: () => string;
   private importer: Importer;
+  private thumbs: ThumbCache | null;
 
   private hostEl: HTMLElement;
   private worldEl!: HTMLElement;
@@ -44,7 +46,8 @@ export class CanvasBoard {
     boardId: string,
     hostEl: HTMLElement,
     getTheme: () => string,
-    importer: Importer
+    importer: Importer,
+    thumbs?: ThumbCache
   ) {
     this.app = app;
     this.store = store;
@@ -52,6 +55,7 @@ export class CanvasBoard {
     this.hostEl = hostEl;
     this.getTheme = getTheme;
     this.importer = importer;
+    this.thumbs = thumbs ?? null;
     this.build();
   }
 
@@ -797,13 +801,22 @@ export class CanvasBoard {
 
     // 内容
     if (it.type === "image" && it.path) {
-      node.createEl("img", {
+      // 画布卡片同样走缩略图缓存(有则用,无则原图+后台生成)
+      const img = node.createEl("img", {
         attr: {
-          src: this.app.vault.adapter.getResourcePath(it.path),
+          src: this.app.vault.adapter.getResourcePath(
+            this.thumbs?.has(it.id) ? this.thumbs.path(it.id) : it.path
+          ),
           alt: it.title || "",
           draggable: "false",
         },
       });
+      if (this.thumbs && !this.thumbs.has(it.id)) {
+        this.thumbs.ensure(it, (p) => {
+          if (img.isConnected)
+            img.src = this.app.vault.adapter.getResourcePath(p);
+        });
+      }
     } else if (it.type === "video" && it.path) {
       const v = node.createEl("video", {
         attr: { loop: "true", playsinline: "true", controls: "true" },

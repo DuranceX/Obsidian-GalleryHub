@@ -7,6 +7,7 @@ import {
   typeFromExt,
 } from "./types";
 import { t } from "./i18n";
+import { ThumbCache } from "./thumbs";
 
 /** 从二进制数据读取图片像素尺寸(失败返回 null,不阻塞导入) */
 async function probeImageSize(
@@ -32,6 +33,9 @@ export type ImportProgressFn = (
 /** 导入外部文件(File 对象,来自 <input type=file> 或拖拽)到 assets/ 并入库 */
 export class Importer {
   constructor(private app: App, private store: GalleryStore) {}
+
+  /** 缩略图缓存(main 注入;删除条目时清理缓存) */
+  thumbs: ThumbCache | null = null;
 
   /** 视图注册的进度监听(页面内进度条);未注册时静默导入 */
   onProgress: ImportProgressFn | null = null;
@@ -400,6 +404,10 @@ export class Importer {
       }
     }
     this.store.deleteItems(items.map((it) => it.id));
+    // 清理对应缩略图缓存
+    if (this.thumbs) {
+      for (const it of items) void this.thumbs.remove(it.id);
+    }
     new Notice(
       alsoTrashFiles
         ? t("deletedNTrash", { n: items.length })

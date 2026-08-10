@@ -8,6 +8,7 @@ import {
 } from "obsidian";
 import { GalleryStore, DB_PATH, setDataRoot } from "./store";
 import { Importer } from "./importer";
+import { ThumbCache } from "./thumbs";
 import { GalleryView, VIEW_TYPE_GALLERY } from "./view";
 import { GalleryHubSettings, DEFAULT_SETTINGS } from "./types";
 import { t, setLocale, detectObsidianLocale } from "./i18n";
@@ -15,6 +16,7 @@ import { t, setLocale, detectObsidianLocale } from "./i18n";
 export default class GalleryHubPlugin extends Plugin {
   store!: GalleryStore;
   importer!: Importer;
+  thumbs!: ThumbCache;
   settings: GalleryHubSettings = { ...DEFAULT_SETTINGS };
 
   async onload(): Promise<void> {
@@ -23,6 +25,8 @@ export default class GalleryHubPlugin extends Plugin {
     setDataRoot(this.settings.dataFolder);
     this.store = new GalleryStore(this.app);
     this.importer = new Importer(this.app, this.store);
+    this.thumbs = new ThumbCache(this.app);
+    this.importer.thumbs = this.thumbs;
 
     this.registerView(
       VIEW_TYPE_GALLERY,
@@ -32,7 +36,8 @@ export default class GalleryHubPlugin extends Plugin {
           this.store,
           this.importer,
           () => this.themeClass(),
-          () => this.settings
+          () => this.settings,
+          this.thumbs
         );
         view.onSettingsChanged = () => void this.saveSettings();
         return view;
@@ -68,6 +73,7 @@ export default class GalleryHubPlugin extends Plugin {
     // 数据初始化(布局就绪后,避免拖慢启动)
     this.app.workspace.onLayoutReady(() => {
       void this.store.init();
+      void this.thumbs.init();
     });
 
     // 外部修改检测(OneDrive 同步等)

@@ -3,6 +3,7 @@ import { GalleryStore } from "./store";
 import { Importer } from "./importer";
 import { GalleryItem, ItemType, SortMode, GalleryHubSettings } from "./types";
 import { CanvasBoard } from "./canvas";
+import { ThumbCache } from "./thumbs";
 import { t } from "./i18n";
 import {
   DetailModal,
@@ -87,19 +88,22 @@ export class GalleryView extends ItemView {
   private boardBtnEl: HTMLButtonElement | null = null;
   private searchEl: HTMLInputElement | null = null;
   private sortBtnEl: HTMLButtonElement | null = null;
+  private thumbs!: ThumbCache;
 
   constructor(
     leaf: WorkspaceLeaf,
     store: GalleryStore,
     importer: Importer,
     getTheme: () => string,
-    getSettings: () => GalleryHubSettings
+    getSettings: () => GalleryHubSettings,
+    thumbs: ThumbCache
   ) {
     super(leaf);
     this.store = store;
     this.importer = importer;
     this.getTheme = getTheme;
     this.getSettings = getSettings;
+    this.thumbs = thumbs;
   }
 
   /** 切换颜色模式(设置变更/Obsidian 主题变化时由插件调用) */
@@ -436,7 +440,8 @@ export class GalleryView extends ItemView {
       id,
       this.canvasHostEl,
       () => this.getTheme(),
-      this.importer
+      this.importer,
+      this.thumbs
     );
     this.refreshBoardSelect();
     this.renderSidebar(); // 更新侧边栏画布模块的选中态
@@ -1226,7 +1231,19 @@ export class GalleryView extends ItemView {
         img.width = it.w;
         img.height = it.h;
       }
-      img.dataset.src = this.app.vault.adapter.getResourcePath(it.path);
+      // 缩略图优先:有缓存直接用;没有则先显示原图并后台生成,
+      // 生成完成后原位替换(下次打开即秒开)
+      if (this.thumbs.has(it.id)) {
+        img.dataset.src = this.app.vault.adapter.getResourcePath(
+          this.thumbs.path(it.id)
+        );
+      } else {
+        img.dataset.src = this.app.vault.adapter.getResourcePath(it.path);
+        this.thumbs.ensure(it, (thumbPath) => {
+          if (img.isConnected)
+            img.src = this.app.vault.adapter.getResourcePath(thumbPath);
+        });
+      }
       this.observer?.observe(img);
     } else if (it.type === "video" && it.path) {
       const video = thumb.createEl("video", {
