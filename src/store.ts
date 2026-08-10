@@ -154,6 +154,17 @@ export class GalleryStore {
     this.scheduleSave();
   }
 
+  /** 批量移除:单次通知与单次保存 */
+  deleteItems(ids: string[]): void {
+    if (this.guardReadOnly()) return;
+    const set = new Set(ids);
+    const before = this.data.items.length;
+    this.data.items = this.data.items.filter((it) => !set.has(it.id));
+    if (this.data.items.length === before) return;
+    this.emit();
+    this.scheduleSave();
+  }
+
   private guardReadOnly(): boolean {
     if (this.readOnly) {
       new Notice("GalleryHub 处于只读模式,修改未保存。");

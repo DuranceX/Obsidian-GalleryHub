@@ -235,6 +235,115 @@ export class DetailModal extends Modal {
   }
 }
 
+/** 选择/新建 assets 子文件夹弹窗 */
+export class FolderPickModal extends Modal {
+  constructor(
+    app: App,
+    private themeClass: string,
+    private folders: string[],
+    private title: string,
+    private onPick: (folder: string) => void
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.modalEl.addClass("ghub-detail-modal", "ghub-addlink", this.themeClass);
+    const bar = this.contentEl.createDiv({ cls: "ghub-panelbar" });
+    bar.createEl("h3", { text: this.title });
+
+    if (this.folders.length) {
+      const list = bar.createDiv({ cls: "ghub-folderlist" });
+      for (const f of this.folders) {
+        const row = list.createDiv({
+          cls: "ghub-folder-row",
+          attr: { role: "button", tabindex: "0" },
+        });
+        const ic = row.createSpan({ cls: "ghub-ficon" });
+        setIcon(ic, "folder");
+        row.createSpan({ text: f });
+        const pick = () => {
+          this.onPick(f);
+          this.close();
+        };
+        row.addEventListener("click", pick);
+        row.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") pick();
+        });
+      }
+    } else {
+      bar.createDiv({
+        cls: "ghub-side-empty",
+        text: "还没有文件夹,在下面新建一个",
+      });
+    }
+
+    const f = bar.createDiv({ cls: "ghub-field" });
+    f.createDiv({ cls: "ghub-field-label", text: "新建文件夹" });
+    const row = f.createDiv({ cls: "ghub-newfolder-row" });
+    const input = row.createEl("input", {
+      attr: { type: "text", placeholder: "文件夹名" },
+    });
+    const btn = row.createEl("button", { text: "创建并选择", cls: "mod-cta" });
+    const submit = () => {
+      const name = input.value.trim();
+      if (!name) return;
+      this.onPick(name);
+      this.close();
+    };
+    btn.addEventListener("click", submit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submit();
+    });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
+/** 批量删除确认弹窗 */
+export class ConfirmDeleteModal extends Modal {
+  constructor(
+    app: App,
+    private themeClass: string,
+    private count: number,
+    private onConfirm: (alsoTrashFiles: boolean) => void
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.modalEl.addClass("ghub-detail-modal", "ghub-addlink", this.themeClass);
+    const bar = this.contentEl.createDiv({ cls: "ghub-panelbar" });
+    bar.createEl("h3", { text: `删除 ${this.count} 个资产?` });
+    bar.createDiv({
+      cls: "ghub-side-empty",
+      text: "「仅移出库」保留原文件;「删除文件」将文件移入系统回收站。",
+    });
+    const actions = bar.createDiv({ cls: "ghub-actions" });
+    const a = actions.createEl("button", { text: "仅移出库(保留文件)" });
+    a.addEventListener("click", () => {
+      this.onConfirm(false);
+      this.close();
+    });
+    const b = actions.createEl("button", {
+      text: "移出库并删除文件(可从回收站恢复)",
+      cls: "ghub-danger",
+    });
+    b.addEventListener("click", () => {
+      this.onConfirm(true);
+      this.close();
+    });
+    const c = actions.createEl("button", { text: "取消" });
+    c.addEventListener("click", () => this.close());
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 /** 添加链接弹窗(暗房皮肤) */
 export class AddLinkModal extends Modal {
   constructor(
