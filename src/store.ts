@@ -41,6 +41,7 @@ export class GalleryStore {
   private app: App;
   private data: GalleryData = emptyData();
   private listeners = new Set<() => void>();
+  private itemListeners = new Set<(id: string) => void>();
   private saveTimer: number | null = null;
   private backedUpThisSession = false;
   /** 本插件自己写文件时置位,用于区分外部修改 */
@@ -117,6 +118,24 @@ export class GalleryStore {
   onChange(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  /**
+   * 单条目元数据变更(编辑标题/标签/评分/prompt 等)的细粒度订阅。
+   * 有订阅者时 updateItem 不再触发全量 onChange,避免详情页每敲一个字
+   * 整个画廊重建(所有卡片闪一下)。
+   */
+  onItemChange(fn: (id: string) => void): () => void {
+    this.itemListeners.add(fn);
+    return () => this.itemListeners.delete(fn);
+  }
+
+  private emitItem(id: string): void {
+    if (this.itemListeners.size === 0) {
+      this.emit(); // 无细粒度订阅者时退回全量通知
+      return;
+    }
+    for (const fn of this.itemListeners) fn(id);
   }
 
   private emit(): void {
@@ -289,7 +308,7 @@ export class GalleryStore {
     const it = this.getItem(id);
     if (!it) return;
     Object.assign(it, patch, { modifiedAt: new Date().toISOString() });
-    this.emit();
+    this.emitItem(id);
     this.scheduleSave();
   }
 

@@ -48,6 +48,10 @@ export class GalleryView extends ItemView {
   private importer: Importer;
   private getTheme: () => string;
   private unsubscribe: (() => void) | null = null;
+  private unsubscribeItem: (() => void) | null = null;
+  /** 网格卡片 DOM 索引(单条目原位更新用) */
+  private gridCardEls = new Map<string, HTMLElement>();
+  private sideTimer: number | null = null;
   private filter: FilterState = {
     search: "",
     type: "all",
@@ -215,6 +219,24 @@ export class GalleryView extends ItemView {
       this.canvas?.refresh();
     });
 
+    // 单条目元数据变更:只原位替换该卡片(避免编辑时全画廊重建闪烁),
+    // 侧边栏(标签/评分计数)防抖刷新
+    this.unsubscribeItem = this.store.onItemChange((id) => {
+      const it = this.store.getItem(id);
+      const old = this.gridCardEls.get(id);
+      if (it && old && old.isConnected) {
+        const fresh = this.card(it);
+        old.replaceWith(fresh);
+        this.gridCardEls.set(id, fresh);
+      }
+      if (this.sideTimer !== null) window.clearTimeout(this.sideTimer);
+      this.sideTimer = window.setTimeout(() => {
+        this.sideTimer = null;
+        this.renderSidebar();
+        this.canvas?.refresh(); // 画布上的标题条/徽标等跟随元数据
+      }, 400);
+    });
+
     // 容器宽度变化 → 列数变化时重排(防抖,避免拖动面板时狂刷)
     this.resizeObserver = new ResizeObserver(() => {
       if (this.resizeTimer !== null) window.clearTimeout(this.resizeTimer);
@@ -231,9 +253,11 @@ export class GalleryView extends ItemView {
 
   async onClose(): Promise<void> {
     this.unsubscribe?.();
+    this.unsubscribeItem?.();
     this.observer?.disconnect();
     this.resizeObserver?.disconnect();
     if (this.resizeTimer !== null) window.clearTimeout(this.resizeTimer);
+    if (this.sideTimer !== null) window.clearTimeout(this.sideTimer);
     this.canvas?.destroy();
     // 释放进度监听(避免视图关闭后 Importer 持有失效 DOM)
     this.importer.onProgress = null;
@@ -1127,6 +1151,7 @@ export class GalleryView extends ItemView {
         (this.store.readOnly ? t("readOnlySuffix") : "")
     );
     this.gridEl.empty();
+    this.gridCardEls.clear();
 
     if (!items.length) {
       const empty = this.gridEl.createDiv({ cls: "ghub-empty" });
@@ -1182,7 +1207,9 @@ export class GalleryView extends ItemView {
       for (let i = 1; i < heights.length; i++) {
         if (heights[i] < heights[target]) target = i;
       }
-      cols[target].appendChild(this.card(it));
+      const cardEl = this.card(it);
+      this.gridCardEls.set(it.id, cardEl);
+      cols[target].appendChild(cardEl);
       // 估算卡片高度占比:图片按宽高比;音频/链接为紧凑固定高;视频兜底 4:3
       const ratio =
         it.w && it.h
