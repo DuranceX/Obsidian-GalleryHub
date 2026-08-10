@@ -1834,6 +1834,10 @@
   overflow: hidden;
 }
 
+.ghub-cel.is-bold .ghub-cel-text {
+  font-weight: 700;
+}
+
 /* 画布元素选中态(与卡片一致) */
 .ghub-cel.is-selected {
   outline: 2px solid var(--ghub-accent);

@@ -108,6 +108,8 @@ export interface BoardElement {
   color?: string;
   /** 文字元素字号(px),缺省 18 */
   fontSize?: number;
+  /** 文字加粗 */
+  bold?: boolean;
 }
 
 /** 画布元素预设色板:[色值, 词典 key];"" = 默认色 */

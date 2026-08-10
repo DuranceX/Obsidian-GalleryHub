@@ -174,6 +174,7 @@ const en = {
   nextItem: "Next (→)",
   deleteSelection: "Delete selection ({n})",
   fontSizeN: "Font size {n}",
+  boldText: "Bold",
 
   // 颜色
   colorDefault: "Default",
@@ -424,6 +425,7 @@ const zh: Record<keyof typeof en, string> = {
   nextItem: "下一个 (→)",
   deleteSelection: "删除选中 ({n})",
   fontSizeN: "字号 {n}",
+  boldText: "加粗",
 
   colorDefault: "默认",
   colorAmber: "琥珀",

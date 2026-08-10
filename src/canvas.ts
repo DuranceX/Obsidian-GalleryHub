@@ -461,6 +461,7 @@ export class CanvasBoard {
     if (el.kind === "frame") node.style.height = `${el.h}px`;
     if (el.kind === "text" && el.fontSize)
       node.style.setProperty("--cel-fs", `${el.fontSize}px`);
+    if (el.kind === "text" && el.bold) node.addClass("is-bold");
     this.applyElementColor(node, el);
 
     // 可编辑文本(text:正文;frame:左上角标题)
@@ -686,6 +687,17 @@ export class CanvasBoard {
         mi.setTitle(t("editText")).setIcon("pencil").onClick(() => startEdit())
       );
       if (el.kind === "text") {
+        // 加粗
+        menu.addItem((mi) =>
+          mi
+            .setTitle(t("boldText"))
+            .setIcon(el.bold ? "check" : "bold")
+            .onClick(() => {
+              el.bold = !el.bold;
+              this.store.updateBoardElement(this.boardId, el.id, { bold: el.bold }, true);
+              node.toggleClass("is-bold", !!el.bold);
+            })
+        );
         // 字号子菜单
         for (const size of [14, 18, 24, 32, 48, 64]) {
           menu.addItem((mi) =>
@@ -819,12 +831,13 @@ export class CanvasBoard {
     // 标题条(悬停显示)
     node.createDiv({ cls: "ghub-cnode-title", text: it.title || "" });
 
-    // ---- 拖拽移动(选中集内的卡片群体移动) ----
+    // ---- 拖拽移动(选中集内群体移动,含文字/画框元素) ----
     let dragging = false;
     let sx = 0;
     let sy = 0;
-    /** 拖动开始时各参与卡片的原始位置 */
+    /** 拖动开始时各参与卡片/元素的原始位置 */
     let dragOrigin: Map<string, { x: number; y: number }> = new Map();
+    let dragElOrigin: Map<string, { x: number; y: number }> = new Map();
     node.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       if ((e.target as HTMLElement).closest(".ghub-cnode-resize")) return;
@@ -842,12 +855,25 @@ export class CanvasBoard {
       dragging = true;
       sx = e.clientX;
       sy = e.clientY;
-      // 群体拖动:选中集包含本卡则一起动,否则只动自己
-      const ids = this.selectedIds.has(it.id) ? [...this.selectedIds] : [it.id];
       dragOrigin = new Map();
-      for (const id of ids) {
-        const p = this.store.getItem(id)?.layouts[this.boardId];
-        if (p) dragOrigin.set(id, { x: p.x, y: p.y });
+      dragElOrigin = new Map();
+      if (this.selectedIds.has(it.id)) {
+        // 群体:选中的卡片 + 选中的元素一起动
+        for (const id of this.selectedIds) {
+          const p = this.store.getItem(id)?.layouts[this.boardId];
+          if (p) dragOrigin.set(id, { x: p.x, y: p.y });
+        }
+        for (const id of this.selectedElIds) {
+          const be = this.store
+            .boardElements(this.boardId)
+            .find((x) => x.id === id);
+          if (be) dragElOrigin.set(id, { x: be.x, y: be.y });
+        }
+      } else {
+        dragOrigin.set(it.id, {
+          x: it.layouts[this.boardId]!.x,
+          y: it.layouts[this.boardId]!.y,
+        });
       }
       node.addClass("is-dragging");
       node.setPointerCapture(e.pointerId);
@@ -868,6 +894,17 @@ export class CanvasBoard {
         el.style.left = `${p.x}px`;
         el.style.top = `${p.y}px`;
       }
+      for (const [id, o] of dragElOrigin) {
+        const be = this.store
+          .boardElements(this.boardId)
+          .find((x) => x.id === id);
+        const dom = this.elEls.get(id);
+        if (!be || !dom) continue;
+        be.x = o.x + dx;
+        be.y = o.y + dy;
+        dom.style.left = `${be.x}px`;
+        dom.style.top = `${be.y}px`;
+      }
     });
     const endDrag = (e: PointerEvent) => {
       if (!dragging) return;
@@ -881,8 +918,21 @@ export class CanvasBoard {
       const ids = [...dragOrigin.keys()];
       ids.forEach((id, i) => {
         const p = this.store.getItem(id)?.layouts[this.boardId];
-        if (p) this.store.setLayout(id, this.boardId, { ...p }, i < ids.length - 1);
+        if (p)
+          this.store.setLayout(
+            id,
+            this.boardId,
+            { ...p },
+            i < ids.length - 1 || dragElOrigin.size > 0
+          );
       });
+      for (const id of dragElOrigin.keys()) {
+        const be = this.store
+          .boardElements(this.boardId)
+          .find((x) => x.id === id);
+        if (be)
+          this.store.updateBoardElement(this.boardId, id, { x: be.x, y: be.y }, true);
+      }
     };
     node.addEventListener("pointerup", endDrag);
     node.addEventListener("pointercancel", endDrag);
