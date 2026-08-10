@@ -8,13 +8,14 @@ export class DetailModal extends Modal {
     app: App,
     private store: GalleryStore,
     private item: GalleryItem,
+    private themeClass: string,
     private onDeleted?: () => void
   ) {
     super(app);
   }
 
   onOpen(): void {
-    this.modalEl.addClass("ghub-detail-modal");
+    this.modalEl.addClass("ghub-detail-modal", this.themeClass);
     const { contentEl } = this;
     contentEl.empty();
     const it = this.item;
@@ -238,17 +239,16 @@ export class DetailModal extends Modal {
 export class AddLinkModal extends Modal {
   constructor(
     app: App,
+    private themeClass: string,
     private onSubmit: (url: string, title: string) => void
   ) {
     super(app);
   }
 
   onOpen(): void {
-    this.modalEl.addClass("ghub-detail-modal", "ghub-addlink");
+    this.modalEl.addClass("ghub-detail-modal", "ghub-addlink", this.themeClass);
     const { contentEl } = this;
     const bar = contentEl.createDiv({ cls: "ghub-panelbar" });
-    bar.style.width = "100%";
-    bar.style.borderLeft = "none";
     bar.createEl("h3", { text: "添加链接" });
     let url = "";
     let title = "";

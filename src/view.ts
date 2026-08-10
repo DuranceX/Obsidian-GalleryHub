@@ -18,6 +18,7 @@ interface FilterState {
 export class GalleryView extends ItemView {
   private store: GalleryStore;
   private importer: Importer;
+  private getTheme: () => string;
   private unsubscribe: (() => void) | null = null;
   private filter: FilterState = {
     search: "",
@@ -30,10 +31,22 @@ export class GalleryView extends ItemView {
   private countEl!: HTMLElement;
   private observer: IntersectionObserver | null = null;
 
-  constructor(leaf: WorkspaceLeaf, store: GalleryStore, importer: Importer) {
+  constructor(
+    leaf: WorkspaceLeaf,
+    store: GalleryStore,
+    importer: Importer,
+    getTheme: () => string
+  ) {
     super(leaf);
     this.store = store;
     this.importer = importer;
+    this.getTheme = getTheme;
+  }
+
+  /** 切换颜色模式(设置变更/Obsidian 主题变化时由插件调用) */
+  applyTheme(themeClass: string): void {
+    this.contentEl.removeClass("ghub-theme-dark", "ghub-theme-light");
+    this.contentEl.addClass(themeClass);
   }
 
   getViewType(): string {
@@ -52,6 +65,7 @@ export class GalleryView extends ItemView {
     const root = this.contentEl;
     root.empty();
     root.addClass("ghub-root");
+    this.applyTheme(this.getTheme());
 
     // 懒加载 observer
     this.observer = new IntersectionObserver(
@@ -133,7 +147,7 @@ export class GalleryView extends ItemView {
       attr: { "aria-label": "添加外部链接" },
     });
     linkBtn.addEventListener("click", () => {
-      new AddLinkModal(this.app, (url, title) => {
+      new AddLinkModal(this.app, this.getTheme(), (url, title) => {
         if (this.importer.addLink(url, title)) new Notice("链接已添加");
       }).open();
     });
@@ -339,8 +353,10 @@ export class GalleryView extends ItemView {
       this.observer?.observe(img);
     } else if (it.type === "video" && it.path) {
       const video = thumb.createEl("video", {
-        attr: { muted: "true", loop: "true", playsinline: "true" },
+        attr: { loop: "true", playsinline: "true" },
       });
+      // muted 必须设 IDL 属性:setAttribute 不影响已创建元素,悬停自动播放会被拒绝
+      video.muted = true;
       video.dataset.src = this.app.vault.adapter.getResourcePath(it.path);
       this.observer?.observe(video);
       card.addEventListener(
@@ -385,7 +401,7 @@ export class GalleryView extends ItemView {
         window.open(it.url);
         return;
       }
-      new DetailModal(this.app, this.store, it).open();
+      new DetailModal(this.app, this.store, it, this.getTheme()).open();
     };
     card.addEventListener("click", open);
     card.addEventListener("keydown", (e) => {

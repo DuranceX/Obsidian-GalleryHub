@@ -1,26 +1,69 @@
 /* =====================================================================
-   GalleryHub — 暗房 Darkroom 视觉系统
-   固定暗色配色(不随 Obsidian 主题),深炭底 + 琥珀点缀,画面绝对优先
+   GalleryHub 视觉系统 — 双模式 Token 化
+   .ghub-theme-dark  暗房 Darkroom:深炭 + 琥珀(ui-ux-pro-max: Photo/Dark)
+   .ghub-theme-light 画廊 Gallery:暖白 + 金(ui-ux-pro-max: Museum/Gallery)
+   规则:
+   1. 颜色只允许出现在 :root 级 token 块,组件规则一律引用 var(--ghub-*)
+   2. 图片上的覆盖层(veil)永远深底白字,与主题无关
+   3. 底色必须压过 Obsidian 主题(.view-content / .modal / 控件白底)
    ===================================================================== */
+
+/* ---------------- Token:暗房 ----------------
+   同时作为 .ghub-root/.ghub-detail-modal 的缺省值(防主题类未挂上时白屏) */
+.ghub-root,
+.ghub-detail-modal,
+.ghub-theme-dark {
+  --ghub-bg: #0e0f11;
+  --ghub-bg-side: #131417;
+  --ghub-stage: #050607;
+  --ghub-panel: #1b1d21;
+  --ghub-panel-2: #22252b;
+  --ghub-border: #2a2d33;
+  --ghub-border-hover: #3a3e46;
+  --ghub-text: #e8e6e3;
+  --ghub-muted: #9a9791;
+  --ghub-faint: #7d7a74;
+  --ghub-accent: #e8b04b;
+  --ghub-accent-hover: #f0be62;
+  --ghub-on-accent: #14120c;
+  --ghub-star-off: #3a3e46;
+  --ghub-danger: #e06c5b;
+  --ghub-danger-bg: rgba(224, 108, 91, 0.12);
+  --ghub-danger-border: rgba(224, 108, 91, 0.35);
+  --ghub-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  --ghub-toolbar-fade: linear-gradient(var(--ghub-bg) 78%, transparent);
+}
+
+/* ---------------- Token:画廊(浅色) ---------------- */
+.ghub-theme-light {
+  --ghub-bg: #fafafa;
+  --ghub-bg-side: #f2f1ee;
+  --ghub-stage: #e9e7e2;
+  --ghub-panel: #ffffff;
+  --ghub-panel-2: #efedea;
+  --ghub-border: #e2e0dc;
+  --ghub-border-hover: #c9c6c0;
+  --ghub-text: #1a1a1a;
+  --ghub-muted: #6b6862;
+  --ghub-faint: #807d76;
+  --ghub-accent: #a16207;
+  --ghub-accent-hover: #8a5406;
+  --ghub-on-accent: #ffffff;
+  --ghub-star-off: #d8d5cf;
+  --ghub-danger: #c2402e;
+  --ghub-danger-bg: rgba(194, 64, 46, 0.08);
+  --ghub-danger-border: rgba(194, 64, 46, 0.35);
+  --ghub-shadow: 0 8px 22px rgba(30, 28, 24, 0.14);
+  --ghub-toolbar-fade: linear-gradient(var(--ghub-bg) 78%, transparent);
+}
 
 .ghub-root,
 .ghub-detail-modal {
-  --ghub-bg: #0e0f11;        /* 主背景:深炭 */
-  --ghub-bg-side: #131417;   /* 侧边栏 */
-  --ghub-panel: #1b1d21;     /* 面板/输入框 */
-  --ghub-panel-2: #22252b;   /* 悬停面板 */
-  --ghub-border: #2a2d33;
-  --ghub-text: #e8e6e3;
-  --ghub-muted: #9a9791;
-  --ghub-faint: #66635d;
-  --ghub-accent: #e8b04b;    /* 琥珀 */
-  --ghub-on-accent: #14120c;
   --ghub-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 /* ================= 根布局 =================
-   注意:必须压过主题的 .workspace-leaf-content .view-content 白底,
-   否则亮色主题下整个视图是白的 —— 选择器提级 + !important 锁死 */
+   必须压过主题的 .workspace-leaf-content .view-content 底色 */
 .workspace-leaf-content .view-content.ghub-root,
 .ghub-root {
   display: flex;
@@ -36,7 +79,7 @@
   outline-offset: -6px;
 }
 
-/* ================= 侧边栏(工作台骨架,暗房皮肤) ================= */
+/* ================= 侧边栏 ================= */
 .ghub-side {
   width: 200px;
   flex-shrink: 0;
@@ -135,7 +178,7 @@
 
 .ghub-tag:hover {
   color: var(--ghub-text);
-  border-color: #3a3e46;
+  border-color: var(--ghub-border-hover);
 }
 
 .ghub-tag.is-active {
@@ -169,7 +212,7 @@
   top: 0;
   z-index: 10;
   padding: 10px 2px 10px;
-  background: linear-gradient(var(--ghub-bg) 78%, transparent);
+  background: var(--ghub-toolbar-fade);
 }
 
 .ghub-root .ghub-search {
@@ -188,8 +231,8 @@
 }
 
 .ghub-root .ghub-search:focus {
-  border-color: var(--ghub-accent);
-  box-shadow: 0 0 0 1px var(--ghub-accent);
+  border-color: var(--ghub-accent) !important;
+  box-shadow: 0 0 0 1px var(--ghub-accent) !important;
 }
 
 .ghub-count {
@@ -215,7 +258,7 @@
 
 .ghub-root button:hover {
   background: var(--ghub-panel-2) !important;
-  border-color: #3a3e46 !important;
+  border-color: var(--ghub-border-hover) !important;
 }
 
 .ghub-root button.mod-cta {
@@ -226,10 +269,10 @@
 }
 
 .ghub-root button.mod-cta:hover {
-  background: #f0be62 !important;
+  background: var(--ghub-accent-hover) !important;
 }
 
-/* ================= 瀑布流(密集,画面优先) ================= */
+/* ================= 瀑布流 ================= */
 .ghub-grid {
   columns: 220px;
   column-gap: 10px;
@@ -270,7 +313,7 @@
 
 .ghub-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--ghub-shadow);
 }
 
 .ghub-card:focus-visible {
@@ -297,8 +340,16 @@
   transform: scale(1.04);
 }
 
-/* ---- 覆盖层:默认隐藏,悬停/聚焦浮现 ---- */
+/* ---- 覆盖层:图片上的元数据,永远深底白字(与主题无关) ----
+   veil 恒定色板显式 token 化:定义在 .ghub-veil 上,禁止改用主题 token */
 .ghub-veil {
+  --veil-shade-top: rgba(8, 8, 10, 0.55);
+  --veil-shade-bottom: rgba(8, 8, 10, 0.82);
+  --veil-text: #fff;
+  --veil-text-dim: #cfccc6;
+  --veil-star: #ffc966;
+  --veil-chip-bg: #e8b04b;
+  --veil-chip-text: #14120c;
   position: absolute;
   inset: 0;
   display: flex;
@@ -306,10 +357,10 @@
   justify-content: space-between;
   padding: 10px;
   background: linear-gradient(
-    rgba(8, 8, 10, 0.55),
+    var(--veil-shade-top),
     transparent 30%,
     transparent 52%,
-    rgba(8, 8, 10, 0.82)
+    var(--veil-shade-bottom)
   );
   opacity: 0;
   transition: opacity 0.25s var(--ghub-ease);
@@ -332,8 +383,8 @@
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  background: var(--ghub-accent);
-  color: var(--ghub-on-accent);
+  background: var(--veil-chip-bg);
+  color: var(--veil-chip-text);
   padding: 3px 8px;
   border-radius: 4px;
 }
@@ -342,7 +393,7 @@
   font-size: 9.5px;
   letter-spacing: 0.1em;
   background: rgba(232, 230, 227, 0.18);
-  color: #fff;
+  color: var(--veil-text);
   padding: 3px 8px;
   border-radius: 4px;
   backdrop-filter: blur(4px);
@@ -352,7 +403,7 @@
 .ghub-veil-bottom .ghub-vtitle {
   font-size: 12.5px;
   font-weight: 600;
-  color: #fff;
+  color: var(--veil-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -365,13 +416,13 @@
   align-items: center;
   margin-top: 3px;
   font-size: 10.5px;
-  color: #cfccc6;
+  color: var(--veil-text-dim);
   overflow: hidden;
   white-space: nowrap;
 }
 
 .ghub-veil-meta .ghub-stars {
-  color: var(--ghub-accent);
+  color: var(--veil-star);
   letter-spacing: -1px;
   flex-shrink: 0;
 }
@@ -384,7 +435,11 @@
   align-items: center;
   justify-content: center;
   gap: 9px;
-  background: radial-gradient(ellipse at center, var(--ghub-panel-2), var(--ghub-panel));
+  background: radial-gradient(
+    ellipse at center,
+    var(--ghub-panel-2),
+    var(--ghub-panel)
+  );
 }
 
 .ghub-linkbox-icon {
@@ -402,23 +457,28 @@
   white-space: nowrap;
 }
 
-/* ================= 详情:暗房 Lightbox =================
-   .modal 在亮色主题下是白底,必须 !important 全部压制 */
+/* ================= 详情 Lightbox =================
+   压过 .modal 的主题底色 */
 .modal.ghub-detail-modal {
   width: min(92vw, 1360px);
   height: min(88vh, 900px);
   max-width: none;
   max-height: none;
   padding: 0 !important;
-  background: #0a0b0d !important;
+  background: var(--ghub-stage) !important;
   border: 1px solid var(--ghub-border);
   overflow: hidden;
   color: var(--ghub-text);
 }
 
 .modal.ghub-detail-modal .modal-close-button {
-  color: #cfccc6;
+  color: var(--ghub-muted) !important;
   z-index: 30;
+}
+
+.modal.ghub-detail-modal .modal-close-button:hover {
+  color: var(--ghub-text) !important;
+  background: var(--ghub-panel) !important;
 }
 
 .modal.ghub-detail-modal .modal-content {
@@ -429,13 +489,13 @@
   background: transparent;
 }
 
-/* ---- 左:舞台(画面占绝对主体) ---- */
+/* ---- 左:舞台 ---- */
 .ghub-stage {
   flex: 1;
   min-width: 0;
   display: grid;
   place-items: center;
-  background: #050607;
+  background: var(--ghub-stage);
   overflow: hidden;
   position: relative;
 }
@@ -510,7 +570,6 @@
   word-break: break-all;
 }
 
-/* 星级点选 */
 .ghub-starpick {
   display: flex;
   gap: 3px;
@@ -519,7 +578,7 @@
 
 .ghub-starpick span {
   font-size: 20px;
-  color: #3a3e46;
+  color: var(--ghub-star-off);
   cursor: pointer;
   transition: color 0.12s ease, transform 0.12s ease;
 }
@@ -532,7 +591,6 @@
   color: var(--ghub-accent);
 }
 
-/* 字段 */
 .ghub-field {
   margin-bottom: 12px;
 }
@@ -559,14 +617,23 @@
   padding: 2px 7px;
   border-radius: 5px;
   --icon-size: 11px;
+  /* 防主题按钮样式穿透(all:unset 无 !important,特异性也低) */
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .ghub-copy-btn:hover {
-  background: var(--ghub-panel);
+  background: var(--ghub-panel) !important;
   color: var(--ghub-accent);
 }
 
-.ghub-panelbar input[type="text"],
+.ghub-copy-btn:focus-visible {
+  outline: 2px solid var(--ghub-accent) !important;
+  outline-offset: 1px;
+}
+
+.ghub-panelbar input[type="text"]:not(.ghub-title-input),
 .ghub-panelbar textarea {
   width: 100%;
   background: var(--ghub-panel) !important;
@@ -575,6 +642,11 @@
   color: var(--ghub-text) !important;
   font-size: 12px;
   padding: 7px 9px;
+}
+
+.ghub-panelbar input::placeholder,
+.ghub-panelbar textarea::placeholder {
+  color: var(--ghub-faint);
 }
 
 .ghub-panelbar textarea {
@@ -587,7 +659,12 @@
 .ghub-panelbar input:focus,
 .ghub-panelbar textarea:focus {
   outline: none;
-  border-color: var(--ghub-accent);
+  border-color: var(--ghub-accent) !important;
+}
+
+.ghub-panelbar input.ghub-title-input:focus {
+  border-color: transparent !important;
+  border-bottom-color: var(--ghub-border) !important;
 }
 
 .ghub-hr {
@@ -596,7 +673,6 @@
   margin: 16px 0 14px;
 }
 
-/* 操作按钮 */
 .ghub-actions {
   display: flex;
   flex-direction: column;
@@ -610,39 +686,61 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  background: var(--ghub-panel);
-  border: 1px solid var(--ghub-border);
-  color: var(--ghub-text);
+  background: var(--ghub-panel) !important;
+  border: 1px solid var(--ghub-border) !important;
+  color: var(--ghub-text) !important;
   font-size: 12.5px;
   border-radius: 8px;
   padding: 8px 12px;
   cursor: pointer;
   --icon-size: 14px;
+  box-shadow: none !important;
 }
 
 .ghub-actions button:hover {
-  background: var(--ghub-panel-2);
+  background: var(--ghub-panel-2) !important;
+}
+
+.ghub-actions button.mod-cta {
+  background: var(--ghub-accent) !important;
+  border-color: var(--ghub-accent) !important;
+  color: var(--ghub-on-accent) !important;
+  font-weight: 600;
+}
+
+.ghub-actions button.mod-cta:hover {
+  background: var(--ghub-accent-hover) !important;
+  border-color: var(--ghub-accent-hover) !important;
 }
 
 .ghub-actions button.ghub-danger {
-  color: #e06c5b;
-  border-color: rgba(224, 108, 91, 0.35);
+  color: var(--ghub-danger) !important;
+  border-color: var(--ghub-danger-border) !important;
 }
 
 .ghub-actions button.ghub-danger:hover {
-  background: rgba(224, 108, 91, 0.12);
+  background: var(--ghub-danger-bg) !important;
 }
 
-/* ================= 添加链接弹窗(沿用暗房) ================= */
+/* ================= 添加链接弹窗 ================= */
 .modal.ghub-detail-modal.ghub-addlink {
-  width: 420px;
+  width: min(420px, 92vw);
   height: auto;
   padding: 20px !important;
+  background: var(--ghub-bg-side) !important;
 }
 
 .modal.ghub-detail-modal.ghub-addlink .modal-content {
   display: block;
   height: auto;
+}
+
+.ghub-addlink .ghub-panelbar {
+  width: 100%;
+  border-left: none;
+  border-top: none !important;
+  height: auto;
+  padding: 0;
 }
 
 /* ================= 窄窗自适应 ================= */
@@ -662,7 +760,7 @@
     height: auto;
     overflow: visible;
   }
-  .ghub-detail-modal .modal-content {
+  .modal.ghub-detail-modal .modal-content {
     flex-direction: column;
   }
   .ghub-panelbar {
@@ -671,6 +769,42 @@
     border-left: none;
     border-top: 1px solid var(--ghub-border);
   }
+}
+
+/* ================= 滚动条(三个滚动容器全部主题化,防主题穿透) ================= */
+.ghub-side,
+.ghub-main,
+.ghub-panelbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ghub-border) transparent;
+}
+
+.ghub-side::-webkit-scrollbar,
+.ghub-main::-webkit-scrollbar,
+.ghub-panelbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.ghub-side::-webkit-scrollbar-track,
+.ghub-main::-webkit-scrollbar-track,
+.ghub-panelbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ghub-side::-webkit-scrollbar-thumb,
+.ghub-main::-webkit-scrollbar-thumb,
+.ghub-panelbar::-webkit-scrollbar-thumb {
+  background: var(--ghub-border);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.ghub-side::-webkit-scrollbar-thumb:hover,
+.ghub-main::-webkit-scrollbar-thumb:hover,
+.ghub-panelbar::-webkit-scrollbar-thumb:hover {
+  background: var(--ghub-border-hover);
+  background-clip: padding-box;
 }
 
 /* ================= 动效降级 ================= */

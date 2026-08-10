@@ -1,20 +1,35 @@
-import { Notice, Plugin, WorkspaceLeaf } from "obsidian";
+import {
+  App,
+  Notice,
+  Plugin,
+  PluginSettingTab,
+  Setting,
+  WorkspaceLeaf,
+} from "obsidian";
 import { GalleryStore, DB_PATH } from "./store";
 import { Importer } from "./importer";
 import { GalleryView, VIEW_TYPE_GALLERY } from "./view";
+import { GalleryHubSettings, DEFAULT_SETTINGS } from "./types";
 
 export default class GalleryHubPlugin extends Plugin {
   store!: GalleryStore;
   importer!: Importer;
+  settings: GalleryHubSettings = { ...DEFAULT_SETTINGS };
 
   async onload(): Promise<void> {
+    await this.loadSettings();
     this.store = new GalleryStore(this.app);
     this.importer = new Importer(this.app, this.store);
 
     this.registerView(
       VIEW_TYPE_GALLERY,
-      (leaf) => new GalleryView(leaf, this.store, this.importer)
+      (leaf) =>
+        new GalleryView(leaf, this.store, this.importer, () =>
+          this.themeClass()
+        )
     );
+
+    this.addSettingTab(new GalleryHubSettingTab(this.app, this));
 
     this.addRibbonIcon("layout-grid", "打开 GalleryHub", () => {
       void this.activateView();
@@ -54,11 +69,49 @@ export default class GalleryHubPlugin extends Plugin {
         }
       })
     );
+
+    // 跟随模式:Obsidian 明暗切换时同步
+    this.registerEvent(
+      this.app.workspace.on("css-change", () => {
+        if (this.settings.colorMode === "follow") this.applyThemeToViews();
+      })
+    );
   }
 
   async onunload(): Promise<void> {
     await this.store.flush();
   }
+
+  // ---------- 主题 ----------
+
+  /** 解析当前应使用的主题类 */
+  themeClass(): "ghub-theme-dark" | "ghub-theme-light" {
+    const mode = this.settings.colorMode;
+    const dark =
+      mode === "dark" ||
+      (mode === "follow" && document.body.classList.contains("theme-dark"));
+    return dark ? "ghub-theme-dark" : "ghub-theme-light";
+  }
+
+  /** 把最新主题应用到所有已打开的画廊视图 */
+  applyThemeToViews(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GALLERY)) {
+      const view = leaf.view;
+      if (view instanceof GalleryView) view.applyTheme(this.themeClass());
+    }
+  }
+
+  // ---------- 设置 ----------
+
+  async loadSettings(): Promise<void> {
+    this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) ?? {}) };
+  }
+
+  async saveSettings(): Promise<void> {
+    await this.saveData(this.settings);
+  }
+
+  // ---------- 视图 ----------
 
   private async activateView(): Promise<void> {
     const { workspace } = this.app;
@@ -71,5 +124,32 @@ export default class GalleryHubPlugin extends Plugin {
       await leaf.setViewState({ type: VIEW_TYPE_GALLERY, active: true });
     }
     void workspace.revealLeaf(leaf);
+  }
+}
+
+class GalleryHubSettingTab extends PluginSettingTab {
+  constructor(app: App, private plugin: GalleryHubPlugin) {
+    super(app, plugin);
+  }
+
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+
+    new Setting(containerEl)
+      .setName("颜色模式")
+      .setDesc("画廊界面的配色。「跟随 Obsidian」会随应用的明暗主题自动切换。")
+      .addDropdown((d) =>
+        d
+          .addOption("dark", "暗色(暗房)")
+          .addOption("light", "浅色(画廊)")
+          .addOption("follow", "跟随 Obsidian")
+          .setValue(this.plugin.settings.colorMode)
+          .onChange(async (v) => {
+            this.plugin.settings.colorMode = v as GalleryHubSettings["colorMode"];
+            await this.plugin.saveSettings();
+            this.plugin.applyThemeToViews();
+          })
+      );
   }
 }

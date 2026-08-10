@@ -2,6 +2,17 @@
 
 export type ItemType = "image" | "video" | "link";
 
+/** 插件颜色模式 */
+export type ColorMode = "light" | "dark" | "follow";
+
+export interface GalleryHubSettings {
+  colorMode: ColorMode;
+}
+
+export const DEFAULT_SETTINGS: GalleryHubSettings = {
+  colorMode: "dark",
+};
+
 export interface GenMeta {
   prompt: string;
   negativePrompt: string;
