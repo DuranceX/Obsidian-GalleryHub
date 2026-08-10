@@ -2,23 +2,81 @@ import { App, Modal, Notice, TFile, setIcon } from "obsidian";
 import { GalleryStore } from "./store";
 import { GalleryItem } from "./types";
 
-/** 暗房 Lightbox:左侧大图舞台 + 右侧信息栏 */
+/** 暗房 Lightbox:左侧大图舞台 + 右侧信息栏;可在序列中左右切换 */
 export class DetailModal extends Modal {
   constructor(
     app: App,
     private store: GalleryStore,
     private item: GalleryItem,
     private themeClass: string,
-    private onDeleted?: () => void
+    private onDeleted?: () => void,
+    /** 可切换的条目序列(当前筛选结果);未提供则无切换按钮 */
+    private sequence?: GalleryItem[]
   ) {
     super(app);
   }
 
   onOpen(): void {
     this.modalEl.addClass("ghub-detail-modal", this.themeClass);
+    this.renderCurrent();
+
+    // ←/→ 键切换
+    this.scope.register([], "ArrowLeft", () => {
+      this.step(-1);
+      return false;
+    });
+    this.scope.register([], "ArrowRight", () => {
+      this.step(1);
+      return false;
+    });
+  }
+
+  private seqIndex(): number {
+    if (!this.sequence) return -1;
+    return this.sequence.findIndex((x) => x.id === this.item.id);
+  }
+
+  private step(dir: -1 | 1): void {
+    if (!this.sequence?.length) return;
+    const idx = this.seqIndex();
+    if (idx < 0) return;
+    const next = this.sequence[idx + dir];
+    if (!next) return;
+    this.item = next;
+    this.renderCurrent();
+  }
+
+  private renderCurrent(): void {
     const { contentEl } = this;
     contentEl.empty();
     const it = this.item;
+
+    // 序列切换按钮(窗口左右边缘悬浮)
+    if (this.sequence && this.sequence.length > 1) {
+      const idx = this.seqIndex();
+      if (idx > 0) {
+        const prev = contentEl.createEl("button", {
+          cls: "ghub-nav-btn ghub-nav-prev",
+          attr: { "aria-label": "上一个 (←)" },
+        });
+        setIcon(prev, "chevron-left");
+        prev.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.step(-1);
+        });
+      }
+      if (idx >= 0 && idx < this.sequence.length - 1) {
+        const next = contentEl.createEl("button", {
+          cls: "ghub-nav-btn ghub-nav-next",
+          attr: { "aria-label": "下一个 (→)" },
+        });
+        setIcon(next, "chevron-right");
+        next.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.step(1);
+        });
+      }
+    }
 
     // ================= 左:舞台 =================
     const stage = contentEl.createDiv({ cls: "ghub-stage" });
@@ -569,6 +627,61 @@ export class BatchEditModal extends Modal {
         }
       }
       new Notice(changed ? `已更新 ${changed} 个资产` : "没有需要修改的内容");
+      this.close();
+    });
+    const cancel = actions.createEl("button", { text: "取消" });
+    cancel.addEventListener("click", () => this.close());
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
+/** 物理删除二次确认(带"不再提醒"勾选) */
+export class ConfirmTrashModal extends Modal {
+  constructor(
+    app: App,
+    private themeClass: string,
+    private count: number,
+    private onConfirm: (skipNextTime: boolean) => void
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.modalEl.addClass("ghub-detail-modal", "ghub-addlink", this.themeClass);
+    const bar = this.contentEl.createDiv({ cls: "ghub-panelbar" });
+
+    const head = bar.createDiv({ cls: "ghub-d-head ghub-addlink-head" });
+    const badge = head.createSpan({ cls: "ghub-d-type" });
+    const ic = badge.createSpan();
+    setIcon(ic, "trash-2");
+    badge.createSpan({ text: `删除 ${this.count} 个资产的文件?` });
+
+    bar.createDiv({
+      cls: "ghub-side-empty",
+      text: "将从库中移除并把文件移入系统回收站(可恢复)。",
+    });
+
+    let skip = false;
+    const skipRow = bar.createDiv({ cls: "ghub-skip-row" });
+    const cb = skipRow.createEl("input", {
+      attr: { type: "checkbox", id: "ghub-skip-confirm" },
+    });
+    skipRow.createEl("label", {
+      text: "不再提醒(可在设置中恢复)",
+      attr: { for: "ghub-skip-confirm" },
+    });
+    cb.addEventListener("change", () => (skip = cb.checked));
+
+    const actions = bar.createDiv({ cls: "ghub-actions" });
+    const ok = actions.createEl("button", {
+      text: "删除(进回收站)",
+      cls: "ghub-danger",
+    });
+    ok.addEventListener("click", () => {
+      this.onConfirm(skip);
       this.close();
     });
     const cancel = actions.createEl("button", { text: "取消" });

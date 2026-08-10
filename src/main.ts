@@ -24,14 +24,17 @@ export default class GalleryHubPlugin extends Plugin {
 
     this.registerView(
       VIEW_TYPE_GALLERY,
-      (leaf) =>
-        new GalleryView(
+      (leaf) => {
+        const view = new GalleryView(
           leaf,
           this.store,
           this.importer,
           () => this.themeClass(),
           () => this.settings
-        )
+        );
+        view.onSettingsChanged = () => void this.saveSettings();
+        return view;
+      }
     );
 
     this.addSettingTab(new GalleryHubSettingTab(this.app, this));
@@ -207,5 +210,15 @@ class GalleryHubSettingTab extends PluginSettingTab {
     moduleToggle("类型", "全部/图片/视频/链接 筛选", "showTypes");
     moduleToggle("评分", "按星级筛选", "showRatings");
     moduleToggle("标签", "标签云筛选", "showTags");
+
+    new Setting(containerEl)
+      .setName("删除文件时跳过确认")
+      .setDesc("物理删除(移入回收站)不再弹出二次确认。")
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.skipDeleteConfirm).onChange(async (v) => {
+          this.plugin.settings.skipDeleteConfirm = v;
+          await this.plugin.saveSettings();
+        })
+      );
   }
 }

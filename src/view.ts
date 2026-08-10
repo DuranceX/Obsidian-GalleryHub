@@ -8,6 +8,7 @@ import {
   AddLinkModal,
   FolderPickModal,
   ConfirmDeleteModal,
+  ConfirmTrashModal,
   BatchEditModal,
 } from "./detail";
 
@@ -69,6 +70,8 @@ export class GalleryView extends ItemView {
   /** 排序方式(页面内状态) */
   private sortMode: SortMode = "created-desc";
   private getSettings: () => GalleryHubSettings;
+  /** 设置被视图内交互修改后(如"不再提醒")回调插件持久化 */
+  onSettingsChanged: (() => void) | null = null;
   /** 画布模式状态 */
   private mode: "grid" | "canvas" = "grid";
   private canvasHostEl!: HTMLElement;
@@ -1299,7 +1302,7 @@ export class GalleryView extends ItemView {
         this.toggleSelect(it, card);
         return;
       }
-      new DetailModal(this.app, this.store, it, this.getTheme()).open();
+      this.openDetail(it);
     };
     card.addEventListener("click", open);
     card.addEventListener("keydown", (e) => {
@@ -1310,6 +1313,125 @@ export class GalleryView extends ItemView {
       }
     });
 
+    // 右键菜单(多选时作用于选中集)
+    card.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      const targets = this.selected.has(it.id)
+        ? this.selectedItems()
+        : [it];
+      const many = targets.length > 1;
+      const label = many ? `${targets.length} 项` : "";
+      const menu = new Menu();
+      if (!many) {
+        menu.addItem((mi) =>
+          mi.setTitle("编辑详情").setIcon("pencil").onClick(() => this.openDetail(it))
+        );
+      } else {
+        menu.addItem((mi) =>
+          mi.setTitle(`批量编辑 ${label}…`).setIcon("pencil").onClick(() => {
+            new BatchEditModal(this.app, this.getTheme(), targets, this.store).open();
+          })
+        );
+      }
+      menu.addItem((mi) =>
+        mi.setTitle(`发送到画布${label ? ` (${label})` : ""}`).setIcon("frame").onClick(() => {
+          this.sendToBoard(targets);
+        })
+      );
+      const movable = targets.filter((t) => t.path);
+      if (movable.length) {
+        menu.addItem((mi) =>
+          mi.setTitle(`移动到…${label ? ` (${label})` : ""}`).setIcon("folder-input").onClick(() => {
+            void this.moveItemsViaPicker(movable);
+          })
+        );
+      }
+      menu.addSeparator();
+      menu.addItem((mi) =>
+        mi.setTitle(`从库中移除${label ? ` (${label})` : ""}`).setIcon("x").onClick(() => {
+          void this.importer.deleteItems(targets, false).then(() => this.clearSelection());
+        })
+      );
+      menu.addItem((mi) =>
+        mi.setTitle(`删除文件${label ? ` (${label})` : ""}`).setIcon("trash-2").onClick(() => {
+          this.deleteWithConfirm(targets);
+        })
+      );
+      menu.showAtMouseEvent(e);
+    });
+
     return card;
+  }
+
+  private openDetail(it: GalleryItem): void {
+    new DetailModal(
+      this.app,
+      this.store,
+      it,
+      this.getTheme(),
+      undefined,
+      this.sortItems(this.filtered())
+    ).open();
+  }
+
+  /** 发送到画布(与批量栏逻辑一致) */
+  private sendToBoard(items: GalleryItem[]): void {
+    if (!items.length) return;
+    let boardId = this.activeBoardId;
+    if (!boardId) {
+      const ids = Object.keys(this.store.getBoards());
+      boardId = ids[0] ?? this.store.createBoard("默认画布");
+      this.activeBoardId = boardId;
+    }
+    if (!boardId) return;
+    this.setMode("canvas");
+    const added = this.canvas?.addItems(items) ?? 0;
+    new Notice(added ? `已放入 ${added} 项到画布` : "所选资产已全部在此画布上");
+    this.clearSelection();
+  }
+
+  /** 移动到…(文件夹选择弹窗) */
+  private async moveItemsViaPicker(items: GalleryItem[]): Promise<void> {
+    const folders = await this.importer.listFolders();
+    new FolderPickModal(
+      this.app,
+      this.getTheme(),
+      folders,
+      `移动 ${items.length} 个资产到…`,
+      (folder) => {
+        void (async () => {
+          if (!(await this.importer.createFolderIfMissing(folder))) return;
+          await this.importer.moveItems(items, folder);
+          await this.refreshFolders();
+          this.clearSelection();
+        })();
+      }
+    ).open();
+  }
+
+  /** 物理删除:带"不再提醒"的二次确认 */
+  private deleteWithConfirm(items: GalleryItem[]): void {
+    const doDelete = () => {
+      void this.importer.deleteItems(items, true).then(() => {
+        this.selected.clear();
+        this.renderBatchBar();
+      });
+    };
+    if (this.getSettings().skipDeleteConfirm) {
+      doDelete();
+      return;
+    }
+    new ConfirmTrashModal(
+      this.app,
+      this.getTheme(),
+      items.length,
+      (skipNextTime) => {
+        if (skipNextTime) {
+          this.getSettings().skipDeleteConfirm = true;
+          this.onSettingsChanged?.();
+        }
+        doDelete();
+      }
+    ).open();
   }
 }

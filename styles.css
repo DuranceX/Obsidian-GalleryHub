@@ -1013,6 +1013,63 @@
   background: var(--ghub-danger-bg) !important;
 }
 
+/* 详情序列切换按钮(舞台左右边缘悬浮) */
+.modal.ghub-detail-modal button.ghub-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 25;
+  width: 40px;
+  height: 64px;
+  padding: 0 !important;
+  display: grid;
+  place-items: center;
+  --icon-size: 22px;
+  background: rgba(12, 12, 14, 0.55) !important;
+  border: 1px solid var(--ghub-border) !important;
+  color: #cfccc6 !important;
+  border-radius: 10px;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  backdrop-filter: blur(4px);
+}
+
+.modal.ghub-detail-modal button.ghub-nav-btn:hover {
+  opacity: 1;
+  background: rgba(12, 12, 14, 0.8) !important;
+  color: #fff !important;
+}
+
+.ghub-nav-prev {
+  left: 12px;
+}
+
+.ghub-nav-next {
+  right: 332px; /* 信息栏 320px + 12px */
+}
+
+@media (max-width: 640px) {
+  .ghub-nav-next {
+    right: 12px;
+  }
+}
+
+/* "不再提醒" 勾选行 */
+.ghub-skip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 0 4px;
+  font-size: 12px;
+  color: var(--ghub-muted);
+}
+
+.ghub-skip-row label {
+  cursor: pointer;
+  user-select: none;
+}
+
 /* ================= 添加链接弹窗 ================= */
 .modal.ghub-detail-modal.ghub-addlink {
   width: min(420px, 92vw);

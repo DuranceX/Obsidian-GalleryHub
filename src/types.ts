@@ -23,6 +23,8 @@ export interface GalleryHubSettings {
   showTypes: boolean;
   showRatings: boolean;
   showTags: boolean;
+  /** 物理删除时跳过二次确认 */
+  skipDeleteConfirm: boolean;
 }
 
 export const DEFAULT_SETTINGS: GalleryHubSettings = {
@@ -33,6 +35,7 @@ export const DEFAULT_SETTINGS: GalleryHubSettings = {
   showTypes: true,
   showRatings: true,
   showTags: true,
+  skipDeleteConfirm: false,
 };
 
 export interface GenMeta {
