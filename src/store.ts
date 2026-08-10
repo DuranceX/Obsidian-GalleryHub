@@ -139,6 +139,26 @@ export class GalleryStore {
     return [...set].sort((a, b) => a.localeCompare(b, "zh"));
   }
 
+  /** 从库内所有条目移除某标签,返回受影响条目数(单次通知与保存) */
+  removeTagEverywhere(tag: string): number {
+    if (this.guardReadOnly()) return 0;
+    let changed = 0;
+    const now = new Date().toISOString();
+    for (const it of this.data.items) {
+      const idx = it.tags.indexOf(tag);
+      if (idx >= 0) {
+        it.tags.splice(idx, 1);
+        it.modifiedAt = now;
+        changed++;
+      }
+    }
+    if (changed) {
+      this.emit();
+      this.scheduleSave();
+    }
+    return changed;
+  }
+
   // ---------- 画布(boards) ----------
 
   getBoards(): Record<string, BoardMeta> {

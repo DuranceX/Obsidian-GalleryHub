@@ -166,6 +166,9 @@
 }
 
 .ghub-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   padding: 3px 10px;
   border-radius: 11px;
@@ -174,6 +177,32 @@
   color: var(--ghub-muted);
   cursor: pointer;
   user-select: none;
+}
+
+/* 标签删除钮:悬停 chip 时出现 */
+.ghub-tag-x {
+  display: none;
+  align-items: center;
+  --icon-size: 10px;
+  margin-right: -4px;
+  padding: 1px;
+  border-radius: 50%;
+  opacity: 0.6;
+}
+
+.ghub-tag:hover .ghub-tag-x {
+  display: flex;
+}
+
+.ghub-tag-x:hover {
+  opacity: 1;
+  background: var(--ghub-danger-bg);
+  color: var(--ghub-danger);
+}
+
+.ghub-tag.is-active .ghub-tag-x:hover {
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
 }
 
 .ghub-tag:hover {

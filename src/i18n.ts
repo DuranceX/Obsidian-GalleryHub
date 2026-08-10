@@ -95,6 +95,10 @@ const en = {
   tags: "Tags",
   noTags: "No tags yet",
   clearTags: "✕ Clear",
+  deleteTagAria: "Delete tag {tag}",
+  deleteTagTitle: "Delete tag \"{tag}\"?",
+  deleteTagDesc: "The tag will be removed from all {n} assets that carry it. Assets themselves are not affected.",
+  tagRemovedN: "Removed tag \"{tag}\" from {n} assets",
 
   // 文件树
   newSubfolder: "New subfolder",
@@ -352,6 +356,10 @@ const zh: Record<keyof typeof en, string> = {
   tags: "标签",
   noTags: "暂无标签",
   clearTags: "✕ 清除",
+  deleteTagAria: "删除标签 {tag}",
+  deleteTagTitle: "删除标签「{tag}」?",
+  deleteTagDesc: "将从携带它的 {n} 个资产上移除该标签,资产本身不受影响。",
+  tagRemovedN: "已从 {n} 个资产移除标签「{tag}」",
 
   newSubfolder: "新建子文件夹",
   deleteFolderMenu: "删除(文件进回收站)",

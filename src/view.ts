@@ -727,8 +727,29 @@ export class GalleryView extends ItemView {
       );
       for (const [tag, n] of sorted) {
         const chip = cloud.createEl("span", {
-          text: `${tag} ${n}`,
           cls: "ghub-tag" + (this.filter.tags.has(tag) ? " is-active" : ""),
+        });
+        chip.createSpan({ text: `${tag} ${n}` });
+        // 悬停显示的删除钮:从所有卡片移除该标签
+        const x = chip.createSpan({
+          cls: "ghub-tag-x",
+          attr: { "aria-label": t("deleteTagAria", { tag }) },
+        });
+        setIcon(x, "x");
+        x.addEventListener("click", (e) => {
+          e.stopPropagation();
+          new ConfirmDeleteModal(
+            this.app,
+            this.getTheme(),
+            n,
+            () => {
+              const changed = this.store.removeTagEverywhere(tag);
+              this.filter.tags.delete(tag);
+              new Notice(t("tagRemovedN", { tag, n: changed }));
+            },
+            t("deleteTagTitle", { tag }),
+            t("deleteTagDesc", { n })
+          ).open();
         });
         chip.addEventListener("click", () => {
           if (this.filter.tags.has(tag)) this.filter.tags.delete(tag);
