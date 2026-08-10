@@ -2,8 +2,11 @@ import { App, Notice, normalizePath } from "obsidian";
 import {
   GalleryData,
   GalleryItem,
+  BoardMeta,
+  LayoutPos,
   SCHEMA_VERSION,
   emptyData,
+  newId,
 } from "./types";
 
 export const ROOT_DIR = "GalleryHub";
@@ -116,6 +119,71 @@ export class GalleryStore {
     const set = new Set<string>();
     for (const it of this.data.items) for (const t of it.tags) set.add(t);
     return [...set].sort((a, b) => a.localeCompare(b, "zh"));
+  }
+
+  // ---------- 画布(boards) ----------
+
+  getBoards(): Record<string, BoardMeta> {
+    return this.data.boards;
+  }
+
+  createBoard(name: string): string | null {
+    if (this.guardReadOnly()) return null;
+    const id = "b-" + newId();
+    this.data.boards[id] = {
+      name: name.trim() || "未命名画布",
+      createdAt: new Date().toISOString(),
+    };
+    this.emit();
+    this.scheduleSave();
+    return id;
+  }
+
+  renameBoard(id: string, name: string): void {
+    if (this.guardReadOnly()) return;
+    const b = this.data.boards[id];
+    if (!b || !name.trim()) return;
+    b.name = name.trim();
+    this.emit();
+    this.scheduleSave();
+  }
+
+  /** 删除画布:条目 layouts 中该画布的位置一并清除 */
+  deleteBoard(id: string): void {
+    if (this.guardReadOnly()) return;
+    if (!this.data.boards[id]) return;
+    if (Object.keys(this.data.boards).length <= 1) return; // 至少保留一个
+    delete this.data.boards[id];
+    for (const it of this.data.items) {
+      if (it.layouts[id]) delete it.layouts[id];
+    }
+    this.emit();
+    this.scheduleSave();
+  }
+
+  /** 画布上条目(带布局) */
+  itemsOnBoard(boardId: string): GalleryItem[] {
+    return this.data.items.filter((it) => it.layouts[boardId]);
+  }
+
+  /**
+   * 写入布局。quiet=true 时不触发订阅刷新(拖拽过程 DOM 已就位,
+   * 全量重渲染反而闪烁),仅防抖落盘。
+   */
+  setLayout(
+    itemId: string,
+    boardId: string,
+    pos: LayoutPos | null,
+    quiet = false
+  ): void {
+    if (this.guardReadOnly()) return;
+    const it = this.getItem(itemId);
+    if (!it) return;
+    if (pos === null) delete it.layouts[boardId];
+    else it.layouts[boardId] = pos;
+    it.modifiedAt = new Date().toISOString();
+    if (!quiet) this.emit();
+    this.scheduleSave();
   }
 
   // ---------- 写 ----------

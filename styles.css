@@ -1259,6 +1259,197 @@
   background: var(--ghub-danger-bg) !important;
 }
 
+/* ================= 画布模式 ================= */
+/* 模式切换分段控件 */
+.ghub-mode {
+  display: flex;
+  background: var(--ghub-panel);
+  border: 1px solid var(--ghub-border);
+  border-radius: 9px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.ghub-root .ghub-mode button.ghub-mode-btn {
+  width: 30px;
+  height: 26px;
+  padding: 0 !important;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  --icon-size: 15px;
+  background: transparent !important;
+  border: none !important;
+  color: var(--ghub-muted) !important;
+}
+
+.ghub-root .ghub-mode button.ghub-mode-btn.is-active {
+  background: var(--ghub-accent) !important;
+  color: var(--ghub-on-accent) !important;
+}
+
+/* 画布宿主:grid 模式下隐藏 */
+.ghub-canvas-host {
+  display: none;
+}
+
+.ghub-mode-canvas .ghub-canvas-host {
+  display: block;
+  flex: 1;
+  min-height: 0;
+}
+
+.ghub-mode-canvas .ghub-grid {
+  display: none;
+}
+
+.ghub-mode-canvas .ghub-main {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+/* 画布本体 */
+.ghub-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  cursor: default;
+  border-radius: 10px 10px 0 0;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--ghub-border) 55%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
+    var(--ghub-stage);
+}
+
+.ghub-canvas.is-pan-ready {
+  cursor: grab;
+}
+
+.ghub-canvas.is-panning {
+  cursor: grabbing;
+}
+
+.ghub-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.ghub-canvas-empty {
+  position: absolute;
+  left: 40px;
+  top: 40px;
+  width: 380px;
+  color: var(--ghub-faint);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* 画布卡片 */
+.ghub-cnode {
+  position: absolute;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--ghub-panel);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  user-select: none;
+}
+
+.ghub-cnode.is-dragging {
+  cursor: grabbing;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+}
+
+.ghub-cnode img,
+.ghub-cnode video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.ghub-cnode video {
+  pointer-events: auto;
+}
+
+.ghub-cnode-link {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+}
+
+.ghub-cnode-link-t {
+  font-size: 12px;
+  color: var(--ghub-muted);
+  text-align: center;
+  word-break: break-all;
+  max-height: 3em;
+  overflow: hidden;
+}
+
+.ghub-cnode-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 9px 6px;
+  font-size: 11px;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(8, 8, 10, 0.7));
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ghub-cnode:hover .ghub-cnode-title {
+  opacity: 1;
+}
+
+.ghub-cnode:hover {
+  outline: 1.5px solid color-mix(in srgb, var(--ghub-accent) 55%, transparent);
+}
+
+/* 缩放手柄 */
+.ghub-cnode-resize {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  --icon-size: 12px;
+  color: #fff;
+  background: rgba(12, 12, 14, 0.6);
+  border-radius: 5px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.ghub-cnode:hover .ghub-cnode-resize {
+  opacity: 1;
+}
+
+/* 画布选择器 */
+.ghub-board-sel {
+  max-width: 180px;
+}
+
 /* ================= 动效降级 ================= */
 @media (prefers-reduced-motion: reduce) {
   .ghub-card,

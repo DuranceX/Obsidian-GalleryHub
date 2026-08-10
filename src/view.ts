@@ -2,6 +2,7 @@ import { ItemView, WorkspaceLeaf, Menu, Notice, setIcon } from "obsidian";
 import { GalleryStore } from "./store";
 import { Importer } from "./importer";
 import { GalleryItem, ItemType, SortMode, GalleryHubSettings } from "./types";
+import { CanvasBoard } from "./canvas";
 import {
   DetailModal,
   AddLinkModal,
@@ -68,6 +69,15 @@ export class GalleryView extends ItemView {
   /** 排序方式(页面内状态) */
   private sortMode: SortMode = "created-desc";
   private getSettings: () => GalleryHubSettings;
+  /** 画布模式状态 */
+  private mode: "grid" | "canvas" = "grid";
+  private canvasHostEl!: HTMLElement;
+  private canvas: CanvasBoard | null = null;
+  private activeBoardId: string | null = null;
+  private modeBtns: { grid: HTMLElement; canvas: HTMLElement } | null = null;
+  private boardSelEl: HTMLSelectElement | null = null;
+  private searchEl: HTMLInputElement | null = null;
+  private sortSelEl: HTMLSelectElement | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -143,6 +153,7 @@ export class GalleryView extends ItemView {
     this.buildToolbar(main);
     this.batchBarEl = main.createDiv({ cls: "ghub-batchbar" });
     this.gridEl = main.createDiv({ cls: "ghub-grid" });
+    this.canvasHostEl = main.createDiv({ cls: "ghub-canvas-host" });
 
     // 拖拽导入(系统文件)
     root.addEventListener("dragover", (e) => {
@@ -176,6 +187,7 @@ export class GalleryView extends ItemView {
       }
       this.render();
       this.renderBatchBar();
+      this.canvas?.refresh();
     });
 
     // 容器宽度变化 → 列数变化时重排(防抖,避免拖动面板时狂刷)
@@ -197,12 +209,48 @@ export class GalleryView extends ItemView {
     this.observer?.disconnect();
     this.resizeObserver?.disconnect();
     if (this.resizeTimer !== null) window.clearTimeout(this.resizeTimer);
+    this.canvas?.destroy();
   }
 
   // ---------- 顶栏 ----------
 
   private buildToolbar(main: HTMLElement): void {
     const bar = main.createDiv({ cls: "ghub-toolbar" });
+
+    // 模式切换:画廊 / 画布
+    const modeWrap = bar.createDiv({ cls: "ghub-mode" });
+    const gridBtn = modeWrap.createEl("button", {
+      cls: "ghub-mode-btn is-active",
+      attr: { "aria-label": "画廊模式", title: "画廊" },
+    });
+    setIcon(gridBtn, "layout-grid");
+    const canvasBtn = modeWrap.createEl("button", {
+      cls: "ghub-mode-btn",
+      attr: { "aria-label": "画布模式", title: "画布" },
+    });
+    setIcon(canvasBtn, "frame");
+    gridBtn.addEventListener("click", () => this.setMode("grid"));
+    canvasBtn.addEventListener("click", () => this.setMode("canvas"));
+    this.modeBtns = { grid: gridBtn, canvas: canvasBtn };
+
+    // 画布选择器(画布模式可见)
+    this.boardSelEl = bar.createEl("select", {
+      cls: "ghub-sort ghub-board-sel",
+      attr: { "aria-label": "选择画布" },
+    });
+    this.boardSelEl.addEventListener("change", () => {
+      const v = this.boardSelEl!.value;
+      if (v === "__new__") {
+        const id = this.store.createBoard(`画布 ${Object.keys(this.store.getBoards()).length + 1}`);
+        if (id) this.openBoard(id);
+      } else if (v === "__rename__") {
+        this.renameActiveBoard();
+      } else if (v === "__delete__") {
+        this.deleteActiveBoard();
+      } else {
+        this.openBoard(v);
+      }
+    });
 
     const search = bar.createEl("input", {
       cls: "ghub-search",
@@ -212,6 +260,7 @@ export class GalleryView extends ItemView {
       this.filter.search = search.value.toLowerCase();
       this.renderGrid();
     });
+    this.searchEl = search;
 
     this.countEl = bar.createDiv({ cls: "ghub-count" });
 
@@ -228,6 +277,7 @@ export class GalleryView extends ItemView {
       this.sortMode = sortSel.value as SortMode;
       this.renderGrid();
     });
+    this.sortSelEl = sortSel;
 
     bar.createDiv({ cls: "ghub-spacer" });
 
@@ -246,6 +296,99 @@ export class GalleryView extends ItemView {
         if (this.importer.addLink(url, title)) new Notice("链接已添加");
       }).open();
     });
+
+    this.updateToolbarMode();
+  }
+
+  // ---------- 画布模式 ----------
+
+  private setMode(mode: "grid" | "canvas"): void {
+    if (this.mode === mode) return;
+    this.mode = mode;
+    if (mode === "canvas") {
+      // 默认进入第一个画布
+      if (!this.activeBoardId) {
+        const ids = Object.keys(this.store.getBoards());
+        this.activeBoardId = ids[0] ?? this.store.createBoard("默认画布");
+      }
+      this.openBoard(this.activeBoardId!);
+    } else {
+      this.canvas?.destroy();
+      this.canvas = null;
+      this.renderGrid();
+    }
+    this.updateToolbarMode();
+  }
+
+  private updateToolbarMode(): void {
+    const isCanvas = this.mode === "canvas";
+    this.contentEl.toggleClass("ghub-mode-canvas", isCanvas);
+    this.modeBtns?.grid.toggleClass("is-active", !isCanvas);
+    this.modeBtns?.canvas.toggleClass("is-active", isCanvas);
+    if (this.boardSelEl) this.boardSelEl.style.display = isCanvas ? "" : "none";
+    if (this.searchEl) this.searchEl.style.display = isCanvas ? "none" : "";
+    if (this.sortSelEl) this.sortSelEl.style.display = isCanvas ? "none" : "";
+    this.refreshBoardSelect();
+  }
+
+  private refreshBoardSelect(): void {
+    const sel = this.boardSelEl;
+    if (!sel) return;
+    sel.empty();
+    const boards = this.store.getBoards();
+    for (const [id, meta] of Object.entries(boards)) {
+      sel.createEl("option", { text: `▦ ${meta.name}`, attr: { value: id } });
+    }
+    sel.createEl("option", { text: "＋ 新建画布", attr: { value: "__new__" } });
+    sel.createEl("option", { text: "✎ 重命名当前画布", attr: { value: "__rename__" } });
+    if (Object.keys(boards).length > 1) {
+      sel.createEl("option", { text: "✕ 删除当前画布", attr: { value: "__delete__" } });
+    }
+    if (this.activeBoardId && boards[this.activeBoardId])
+      sel.value = this.activeBoardId;
+  }
+
+  private openBoard(id: string): void {
+    this.activeBoardId = id;
+    this.canvas?.destroy();
+    this.canvas = new CanvasBoard(
+      this.app,
+      this.store,
+      id,
+      this.canvasHostEl,
+      () => this.getTheme()
+    );
+    this.refreshBoardSelect();
+    this.countEl.setText(
+      `${this.store.itemsOnBoard(id).length} 项在画布上`
+    );
+  }
+
+  private renameActiveBoard(): void {
+    if (!this.activeBoardId) return;
+    const cur = this.store.getBoards()[this.activeBoardId];
+    const name = window.prompt("画布名称", cur?.name ?? "");
+    if (name?.trim()) this.store.renameBoard(this.activeBoardId, name);
+    this.refreshBoardSelect();
+  }
+
+  private deleteActiveBoard(): void {
+    if (!this.activeBoardId) return;
+    const boards = this.store.getBoards();
+    const cur = boards[this.activeBoardId];
+    new ConfirmDeleteModal(
+      this.app,
+      this.getTheme(),
+      this.store.itemsOnBoard(this.activeBoardId).length,
+      () => {
+        const doomed = this.activeBoardId!;
+        this.store.deleteBoard(doomed);
+        const next = Object.keys(this.store.getBoards())[0];
+        this.openBoard(next);
+      },
+      `删除画布「${cur?.name}」?`,
+      "只删除画布与卡片布局,资产本身保留在库中。"
+    ).open();
   }
 
   private pickFiles(): void {
@@ -329,6 +472,29 @@ export class GalleryView extends ItemView {
           }
         ).open();
       });
+    });
+
+    // 发送到画布
+    const toBoard = bar.createEl("button", { text: "发送到画布" });
+    toBoard.addEventListener("click", () => {
+      const items = this.selectedItems();
+      if (!items.length) return;
+      // 确保有画布
+      let boardId = this.activeBoardId;
+      if (!boardId) {
+        const ids = Object.keys(this.store.getBoards());
+        boardId = ids[0] ?? this.store.createBoard("默认画布");
+        this.activeBoardId = boardId;
+      }
+      if (!boardId) return;
+      this.setMode("canvas");
+      const added = this.canvas?.addItems(items) ?? 0;
+      new Notice(
+        added
+          ? `已放入 ${added} 项到画布`
+          : "所选资产已全部在此画布上"
+      );
+      this.clearSelection();
     });
 
     const del = bar.createEl("button", { text: "删除…", cls: "ghub-danger" });
@@ -811,6 +977,13 @@ export class GalleryView extends ItemView {
   }
 
   private renderGrid(): void {
+    if (this.mode === "canvas") {
+      if (this.activeBoardId)
+        this.countEl.setText(
+          `${this.store.itemsOnBoard(this.activeBoardId).length} 项在画布上`
+        );
+      return;
+    }
     const items = this.filtered();
     this.countEl.setText(
       `${items.length} / ${this.store.getItems().length} 项` +
