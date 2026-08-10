@@ -344,6 +344,20 @@ export class DetailModal extends Modal {
       input.addEventListener("input", () => this.patch({ source: input.value }));
     });
 
+    // ---- 源文件位置(自定义,可作"图片链接") ----
+    this.field(bar, "源文件位置", (wrap) => {
+      const input = wrap.createEl("input", {
+        attr: {
+          type: "text",
+          placeholder: "留空 = 库内文件;可填系统路径或 URL",
+        },
+      });
+      input.value = it.originPath ?? "";
+      input.addEventListener("input", () =>
+        this.patch({ originPath: input.value.trim() || undefined })
+      );
+    });
+
     // ---- 生成参数分区卡片 ----
     const genSec = bar.createDiv({ cls: "ghub-sec" });
     const genHead = genSec.createDiv({ cls: "ghub-sec-head" });

@@ -78,6 +78,8 @@ export interface GalleryItem {
   tags: string[];
   rating: number;
   source: string;
+  /** 自定义源文件位置(系统绝对路径或 URL);空 = 默认用库内文件位置 */
+  originPath?: string;
   gen: GenMeta;
   layouts: Record<string, LayoutPos>;
 }

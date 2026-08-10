@@ -1329,6 +1329,13 @@ export class GalleryView extends ItemView {
           })
         );
       }
+      if (!many && (it.path || it.originPath)) {
+        menu.addItem((mi) =>
+          mi.setTitle("打开源文件位置").setIcon("folder-open").onClick(() => {
+            this.revealOrigin(it);
+          })
+        );
+      }
       menu.addSeparator();
       menu.addItem((mi) =>
         mi.setTitle(`从库中移除${label ? ` (${label})` : ""}`).setIcon("x").onClick(() => {
@@ -1344,6 +1351,39 @@ export class GalleryView extends ItemView {
     });
 
     return card;
+  }
+
+  /** 打开源文件位置:自定义 originPath 优先(URL 开浏览器/路径开资源管理器),否则揭示库内文件 */
+  private revealOrigin(it: GalleryItem): void {
+    const origin = it.originPath?.trim();
+    if (origin) {
+      if (/^https?:\/\//i.test(origin)) {
+        window.open(origin);
+        return;
+      }
+      // 系统绝对路径:在资源管理器中显示
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { shell } = require("electron");
+        void shell.showItemInFolder(origin);
+      } catch {
+        new Notice("无法打开该路径");
+      }
+      return;
+    }
+    if (it.path) {
+      // 库内文件:换算绝对路径后在资源管理器中显示
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { shell } = require("electron");
+        const adapter = this.app.vault.adapter as { getFullPath?: (p: string) => string };
+        const full = adapter.getFullPath?.(it.path);
+        if (full) void shell.showItemInFolder(full);
+        else new Notice("无法定位文件");
+      } catch {
+        new Notice("无法打开文件位置");
+      }
+    }
   }
 
   private openDetail(it: GalleryItem): void {
