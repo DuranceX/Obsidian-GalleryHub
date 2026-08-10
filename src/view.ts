@@ -91,14 +91,6 @@ export class GalleryView extends ItemView {
     this.importer = importer;
     this.getTheme = getTheme;
     this.getSettings = getSettings;
-    const def = getSettings().defaultFolder;
-    if (def) {
-      this.filter.folder = def;
-      // 默认文件夹的祖先链全部展开
-      const parts = def.split("/");
-      for (let i = 1; i <= parts.length; i++)
-        this.expanded.add(parts.slice(0, i).join("/"));
-    }
   }
 
   /** 切换颜色模式(设置变更/Obsidian 主题变化时由插件调用) */
@@ -737,7 +729,7 @@ export class GalleryView extends ItemView {
     }
   }
 
-  /** 设置变化后由插件调用:重渲染侧边栏(隐藏模块对应的筛选同时复位) */
+  /** 设置变化后由插件调用:重渲染侧边栏(隐藏模块对应的筛选同时复位);数据根变更时同步刷新文件树与网格 */
   refreshSidebar(): void {
     const cfg = this.getSettings();
     let gridDirty = false;
@@ -757,8 +749,10 @@ export class GalleryView extends ItemView {
       this.filter.tags.clear();
       gridDirty = true;
     }
-    this.renderSidebar();
-    if (gridDirty) this.renderGrid();
+    void gridDirty;
+    // 数据根可能已变更:文件树与网格一并刷新
+    void this.refreshFolders();
+    this.renderGrid();
   }
 
   private fitem(
@@ -1153,9 +1147,9 @@ export class GalleryView extends ItemView {
         it.w && it.h
           ? it.h / it.w
           : it.type === "audio"
-            ? 0.45
+            ? 0.52
             : it.type === "link"
-              ? 0.35
+              ? 0.32
               : 0.75;
       heights[target] += ratio + 0.06; // 0.06 ≈ 卡片间距占比
     }
@@ -1237,10 +1231,10 @@ export class GalleryView extends ItemView {
       const head = box.createDiv({ cls: "ghub-audiobox-head" });
       const ic = head.createDiv({ cls: "ghub-audiobox-icon" });
       setIcon(ic, "music");
-      head.createDiv({
-        cls: "ghub-linkbox-domain",
-        text: it.fileName ?? "",
-      });
+      const tw = head.createDiv({ cls: "ghub-audiobox-titles" });
+      tw.createDiv({ cls: "ghub-audiobox-title", text: it.title || "(无标题)" });
+      if (it.fileName && it.fileName !== it.title)
+        tw.createDiv({ cls: "ghub-linkbox-domain", text: it.fileName });
       const audio = box.createEl("audio", {
         cls: "ghub-audio-player",
         attr: { controls: "true", preload: "none" },
@@ -1253,8 +1247,10 @@ export class GalleryView extends ItemView {
       const box = thumb.createDiv({ cls: "ghub-linkbox" });
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
       setIcon(ic, "link");
+      const tw = box.createDiv({ cls: "ghub-audiobox-titles" });
+      tw.createDiv({ cls: "ghub-audiobox-title", text: it.title || "(无标题)" });
       try {
-        box.createDiv({
+        tw.createDiv({
           cls: "ghub-linkbox-domain",
           text: new URL(it.url ?? "").hostname,
         });
@@ -1263,19 +1259,20 @@ export class GalleryView extends ItemView {
       }
     }
 
-    // 覆盖层:悬停/聚焦时浮现的元数据(画面优先,不占卡片空间)
-    const veil = card.createDiv({ cls: "ghub-veil" });
-    const top = veil.createDiv({ cls: "ghub-veil-top" });
-    if (it.gen.prompt) top.createSpan({ cls: "ghub-chip-p", text: "PROMPT" });
-    if (it.type === "video") top.createSpan({ cls: "ghub-chip-v", text: "▶ VIDEO" });
-    if (it.type === "audio") top.createSpan({ cls: "ghub-chip-v", text: "♪ AUDIO" });
-    const bottom = veil.createDiv({ cls: "ghub-veil-bottom" });
-    bottom.createDiv({ cls: "ghub-vtitle", text: it.title || "(无标题)" });
-    const meta = bottom.createDiv({ cls: "ghub-veil-meta" });
-    if (it.rating > 0)
-      meta.createSpan({ text: "★".repeat(it.rating), cls: "ghub-stars" });
-    if (it.gen.model) meta.createSpan({ text: it.gen.model });
-    if (it.tags.length) meta.createSpan({ text: it.tags.slice(0, 2).join(" · ") });
+    // 覆盖层:悬停浮现元数据(音频/链接卡片信息已外显,不加遮挡)
+    if (it.type !== "audio" && it.type !== "link") {
+      const veil = card.createDiv({ cls: "ghub-veil" });
+      const top = veil.createDiv({ cls: "ghub-veil-top" });
+      if (it.gen.prompt) top.createSpan({ cls: "ghub-chip-p", text: "PROMPT" });
+      if (it.type === "video") top.createSpan({ cls: "ghub-chip-v", text: "▶ VIDEO" });
+      const bottom = veil.createDiv({ cls: "ghub-veil-bottom" });
+      bottom.createDiv({ cls: "ghub-vtitle", text: it.title || "(无标题)" });
+      const meta = bottom.createDiv({ cls: "ghub-veil-meta" });
+      if (it.rating > 0)
+        meta.createSpan({ text: "★".repeat(it.rating), cls: "ghub-stars" });
+      if (it.gen.model) meta.createSpan({ text: it.gen.model });
+      if (it.tags.length) meta.createSpan({ text: it.tags.slice(0, 2).join(" · ") });
+    }
 
     // 选择圆钮:悬停或已选中时可见;点击只切换选择,不打开详情
     const check = card.createDiv({

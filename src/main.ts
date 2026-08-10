@@ -6,7 +6,7 @@ import {
   Setting,
   WorkspaceLeaf,
 } from "obsidian";
-import { GalleryStore, DB_PATH } from "./store";
+import { GalleryStore, DB_PATH, setDataRoot } from "./store";
 import { Importer } from "./importer";
 import { GalleryView, VIEW_TYPE_GALLERY } from "./view";
 import { GalleryHubSettings, DEFAULT_SETTINGS } from "./types";
@@ -18,6 +18,7 @@ export default class GalleryHubPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    setDataRoot(this.settings.dataFolder);
     this.store = new GalleryStore(this.app);
     this.importer = new Importer(this.app, this.store);
 
@@ -165,17 +166,21 @@ class GalleryHubSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("默认文件夹")
+      .setName("数据文件夹")
       .setDesc(
-        "打开画廊时默认进入的文件夹(assets 下的相对路径,如「角色/机甲」;留空为全部)。"
+        "gallery.json 与 assets/ 的存放位置(仓库相对路径,可多级如「xxx/yyy」)。修改后在新位置初始化;旧数据不会自动迁移,如需保留请手动移动文件夹后再修改此项。"
       )
       .addText((t) =>
         t
-          .setPlaceholder("留空 = 全部")
-          .setValue(this.plugin.settings.defaultFolder)
+          .setPlaceholder("GalleryHub")
+          .setValue(this.plugin.settings.dataFolder)
           .onChange(async (v) => {
-            this.plugin.settings.defaultFolder = v.trim().replace(/^\/+|\/+$/g, "");
+            const clean = v.trim().replace(/^\/+|\/+$/g, "");
+            this.plugin.settings.dataFolder = clean || "GalleryHub";
             await this.plugin.saveSettings();
+            setDataRoot(this.plugin.settings.dataFolder);
+            await this.plugin.store.init();
+            this.plugin.refreshViews();
           })
       );
 

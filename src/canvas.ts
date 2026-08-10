@@ -639,11 +639,15 @@ export class CanvasBoard {
     const pos = it.layouts[this.boardId];
     if (!pos) return;
     const node = this.worldEl.createDiv({ cls: "ghub-cnode" });
+    if (it.type === "audio" || it.type === "link")
+      node.addClass("ghub-cnode-flat");
     this.cardEls.set(it.id, node);
     if (this.selectedIds.has(it.id)) node.addClass("is-selected");
+    const freeform = it.type === "audio" || it.type === "link";
     const ratio = it.w && it.h ? it.h / it.w : 0.75;
     const width = pos.w || DEFAULT_CARD_W;
-    const height = pos.h ?? width * ratio;
+    const height =
+      pos.h ?? (freeform ? (it.type === "audio" ? 96 : 56) : width * ratio);
     node.style.left = `${pos.x}px`;
     node.style.top = `${pos.y}px`;
     node.style.width = `${width}px`;
@@ -753,16 +757,21 @@ export class CanvasBoard {
     node.addEventListener("pointerup", endDrag);
     node.addEventListener("pointercancel", endDrag);
 
-    // ---- 右下角缩放手柄 ----
+    // ---- 右下角缩放手柄(图片/视频等比;音频/链接自由缩放) ----
     const handle = node.createDiv({ cls: "ghub-cnode-resize" });
     setIcon(handle, "move-diagonal-2");
     let resizing = false;
     let rw = 0;
+    let rh = 0;
+    let rsy = 0;
     node.addEventListener("pointerdown", (e) => {
       if (!(e.target as HTMLElement).closest(".ghub-cnode-resize")) return;
       resizing = true;
       sx = e.clientX;
-      rw = it.layouts[this.boardId]!.w || DEFAULT_CARD_W;
+      rsy = e.clientY;
+      const cur = it.layouts[this.boardId]!;
+      rw = cur.w || DEFAULT_CARD_W;
+      rh = cur.h ?? node.offsetHeight;
       node.setPointerCapture(e.pointerId);
       e.stopPropagation();
       e.preventDefault();
@@ -771,9 +780,16 @@ export class CanvasBoard {
       if (!resizing) return;
       const cur = it.layouts[this.boardId]!;
       cur.w = Math.max(60, rw + (e.clientX - sx) / this.scale);
-      cur.h = null; // 保持宽高比
-      node.style.width = `${cur.w}px`;
-      node.style.height = `${cur.w * ratio}px`;
+      if (freeform) {
+        // 音频/链接:宽高独立
+        cur.h = Math.max(40, rh + (e.clientY - rsy) / this.scale);
+        node.style.width = `${cur.w}px`;
+        node.style.height = `${cur.h}px`;
+      } else {
+        cur.h = null; // 保持宽高比
+        node.style.width = `${cur.w}px`;
+        node.style.height = `${cur.w * ratio}px`;
+      }
     });
     const endResize = (e: PointerEvent) => {
       if (!resizing) return;
@@ -909,11 +925,12 @@ export class CanvasBoard {
     );
     items.forEach((it, i) => {
       if (it.layouts[this.boardId]) return; // 已在画布上
+      const flat = it.type === "audio" || it.type === "link";
       const pos: LayoutPos = {
         x: center.x - DEFAULT_CARD_W / 2 + (i % 4) * 40,
         y: center.y - 120 + Math.floor(i / 4) * 40 + i * 12,
-        w: DEFAULT_CARD_W,
-        h: null,
+        w: flat ? 240 : DEFAULT_CARD_W,
+        h: flat ? (it.type === "audio" ? 96 : 56) : null,
         z: maxZ + 1 + i,
       };
       this.store.setLayout(it.id, this.boardId, pos, i < items.length - 1);

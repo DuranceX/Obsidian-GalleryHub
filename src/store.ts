@@ -10,10 +10,23 @@ import {
   newId,
 } from "./types";
 
-export const ROOT_DIR = "GalleryHub";
-export const DB_PATH = `${ROOT_DIR}/gallery.json`;
-export const BAK_PATH = `${ROOT_DIR}/gallery.json.bak`;
-export const ASSETS_DIR = `${ROOT_DIR}/assets`;
+/**
+ * 数据根目录(仓库相对路径),默认 "GalleryHub"。
+ * 可在设置中改为任意路径(如 "xxx/yyy"),插件将在该目录下初始化
+ * gallery.json 与 assets/。通过 setDataRoot 在 store.init 前设置。
+ */
+export let ROOT_DIR = "GalleryHub";
+export let DB_PATH = `${ROOT_DIR}/gallery.json`;
+export let BAK_PATH = `${ROOT_DIR}/gallery.json.bak`;
+export let ASSETS_DIR = `${ROOT_DIR}/assets`;
+
+export function setDataRoot(root: string): void {
+  const clean = normalizePath(root.trim().replace(/^\/+|\/+$/g, "")) || "GalleryHub";
+  ROOT_DIR = clean;
+  DB_PATH = `${ROOT_DIR}/gallery.json`;
+  BAK_PATH = `${ROOT_DIR}/gallery.json.bak`;
+  ASSETS_DIR = `${ROOT_DIR}/assets`;
+}
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -42,8 +55,14 @@ export class GalleryStore {
 
   async init(): Promise<void> {
     const ad = this.app.vault.adapter;
-    if (!(await ad.exists(normalizePath(ROOT_DIR)))) {
-      await ad.mkdir(normalizePath(ROOT_DIR));
+    // 支持多级路径逐级创建(如 xxx/yyy/GalleryHub)
+    const parts = normalizePath(ROOT_DIR).split("/");
+    let cur = "";
+    for (const p of parts) {
+      cur = cur ? `${cur}/${p}` : p;
+      if (!(await ad.exists(normalizePath(cur)))) {
+        await ad.mkdir(normalizePath(cur));
+      }
     }
     if (!(await ad.exists(normalizePath(ASSETS_DIR)))) {
       await ad.mkdir(normalizePath(ASSETS_DIR));

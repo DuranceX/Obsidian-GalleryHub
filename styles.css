@@ -435,12 +435,12 @@
   flex-shrink: 0;
 }
 
-/* ---- 音频卡片(紧凑,图标+名称并排) ---- */
+/* ---- 音频卡片(信息外显,无 veil 遮挡) ---- */
 .ghub-audiobox {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 10px;
+  gap: 10px;
+  padding: 14px 12px 12px;
   background: radial-gradient(
     ellipse at center,
     var(--ghub-panel-2),
@@ -451,27 +451,46 @@
 .ghub-audiobox-head {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 9px;
   min-width: 0;
 }
 
 .ghub-audiobox-icon {
-  --icon-size: 15px;
+  --icon-size: 20px;
   color: var(--ghub-muted);
   display: flex;
   flex-shrink: 0;
 }
 
-.ghub-audiobox .ghub-linkbox-domain {
+.ghub-audiobox-titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ghub-audiobox-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ghub-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ghub-audiobox .ghub-linkbox-domain,
+.ghub-linkbox .ghub-linkbox-domain {
   font-size: 11px;
   max-width: none;
-  flex: 1;
+  min-width: 0;
   text-align: left;
 }
 
 .ghub-audio-player {
   width: 100%;
-  height: 26px;
+  min-width: 0;
+  height: 30px;
 }
 
 /* 详情舞台音频 */
@@ -506,13 +525,13 @@
 }
 
 /* ---- 链接卡片 ---- */
-/* ---- 链接卡片(紧凑,图标+域名并排) ---- */
+/* ---- 链接卡片(信息外显,无 veil 遮挡) ---- */
 .ghub-linkbox {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 8px;
-  padding: 14px 12px;
+  gap: 10px;
+  padding: 16px 14px;
   background: radial-gradient(
     ellipse at center,
     var(--ghub-panel-2),
@@ -521,7 +540,7 @@
 }
 
 .ghub-linkbox-icon {
-  --icon-size: 15px;
+  --icon-size: 20px;
   color: var(--ghub-muted);
   display: flex;
   flex-shrink: 0;
@@ -1552,6 +1571,32 @@
   outline-offset: 1px;
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--ghub-accent) 22%, transparent),
     0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+/* 画布上的音频/链接节点(紧凑,内容自适应) */
+.ghub-cnode-flat .ghub-linkbox,
+.ghub-cnode-flat .ghub-audiobox {
+  width: 100%;
+  height: 100%;
+  padding: 8px 10px;
+  gap: 5px;
+}
+
+.ghub-cnode-flat .ghub-audiobox-icon,
+.ghub-cnode-flat .ghub-linkbox-icon {
+  --icon-size: 14px;
+}
+
+.ghub-cnode-flat .ghub-audiobox-title {
+  font-size: 11.5px;
+}
+
+.ghub-cnode-flat .ghub-audio-player,
+.ghub-cnode-audio audio {
+  height: 24px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 0;
 }
 
 /* ================= 画布悬浮工具栏 ================= */

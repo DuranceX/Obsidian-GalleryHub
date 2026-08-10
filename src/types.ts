@@ -15,8 +15,8 @@ export type SortMode =
 
 export interface GalleryHubSettings {
   colorMode: ColorMode;
-  /** 打开画廊时默认进入的文件夹(assets 相对路径,"" = 全部) */
-  defaultFolder: string;
+  /** 数据文件夹(仓库相对路径):在此目录下初始化 gallery.json 与 assets/,默认 "GalleryHub" */
+  dataFolder: string;
   /** 侧边栏模块开关 */
   showFolders: boolean;
   showBoards: boolean;
@@ -27,7 +27,7 @@ export interface GalleryHubSettings {
 
 export const DEFAULT_SETTINGS: GalleryHubSettings = {
   colorMode: "dark",
-  defaultFolder: "",
+  dataFolder: "GalleryHub",
   showFolders: true,
   showBoards: true,
   showTypes: true,
