@@ -575,6 +575,16 @@ export class CanvasBoard {
       v.muted = true;
       v.preload = "metadata";
       v.src = this.app.vault.adapter.getResourcePath(it.path);
+    } else if (it.type === "audio" && it.path) {
+      const box = node.createDiv({ cls: "ghub-cnode-link ghub-cnode-audio" });
+      const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
+      setIcon(ic, "music");
+      box.createDiv({ text: it.title || "", cls: "ghub-cnode-link-t" });
+      const audio = box.createEl("audio", {
+        attr: { controls: "true", preload: "none" },
+      });
+      audio.src = this.app.vault.adapter.getResourcePath(it.path);
+      audio.addEventListener("pointerdown", (e) => e.stopPropagation());
     } else if (it.type === "link") {
       const box = node.createDiv({ cls: "ghub-cnode-link" });
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });

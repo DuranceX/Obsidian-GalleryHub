@@ -450,7 +450,7 @@ export class GalleryView extends ItemView {
 
   private pickFiles(): void {
     const input = createEl("input", {
-      attr: { type: "file", multiple: "true", accept: "image/*,video/*" },
+      attr: { type: "file", multiple: "true", accept: "image/*,video/*,audio/*" },
     });
     input.addEventListener("change", () => {
       if (input.files?.length)
@@ -657,6 +657,7 @@ export class GalleryView extends ItemView {
         ["all", "layers", "全部资产", all.length],
         ["image", "image", "图片", all.filter((i) => i.type === "image").length],
         ["video", "film", "视频", all.filter((i) => i.type === "video").length],
+        ["audio", "music", "音频", all.filter((i) => i.type === "audio").length],
         ["link", "link", "链接", all.filter((i) => i.type === "link").length],
       ];
       for (const [val, icon, label, n] of typeDefs) {
@@ -1170,7 +1171,7 @@ export class GalleryView extends ItemView {
             b.rating - a.rating || b.createdAt.localeCompare(a.createdAt)
         );
       case "type": {
-        const order = { image: 0, video: 1, link: 2 };
+        const order = { image: 0, video: 1, audio: 2, link: 3 };
         return arr.sort(
           (a, b) =>
             order[a.type] - order[b.type] ||
@@ -1224,6 +1225,22 @@ export class GalleryView extends ItemView {
         () => void video.play().catch(() => {})
       );
       card.addEventListener("mouseleave", () => video.pause());
+    } else if (it.type === "audio" && it.path) {
+      const box = thumb.createDiv({ cls: "ghub-audiobox" });
+      const ic = box.createDiv({ cls: "ghub-audiobox-icon" });
+      setIcon(ic, "music");
+      box.createDiv({
+        cls: "ghub-linkbox-domain",
+        text: it.fileName ?? "",
+      });
+      const audio = box.createEl("audio", {
+        cls: "ghub-audio-player",
+        attr: { controls: "true", preload: "none" },
+      });
+      audio.src = this.app.vault.adapter.getResourcePath(it.path);
+      // 播放器交互不触发卡片打开/选择
+      audio.addEventListener("click", (e) => e.stopPropagation());
+      audio.addEventListener("pointerdown", (e) => e.stopPropagation());
     } else if (it.type === "link") {
       const box = thumb.createDiv({ cls: "ghub-linkbox" });
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
@@ -1243,6 +1260,7 @@ export class GalleryView extends ItemView {
     const top = veil.createDiv({ cls: "ghub-veil-top" });
     if (it.gen.prompt) top.createSpan({ cls: "ghub-chip-p", text: "PROMPT" });
     if (it.type === "video") top.createSpan({ cls: "ghub-chip-v", text: "▶ VIDEO" });
+    if (it.type === "audio") top.createSpan({ cls: "ghub-chip-v", text: "♪ AUDIO" });
     const bottom = veil.createDiv({ cls: "ghub-veil-bottom" });
     bottom.createDiv({ cls: "ghub-vtitle", text: it.title || "(无标题)" });
     const meta = bottom.createDiv({ cls: "ghub-veil-meta" });

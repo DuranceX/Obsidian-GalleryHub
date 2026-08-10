@@ -49,6 +49,18 @@ export class DetailModal extends Modal {
           loop: "true",
         },
       });
+    } else if (it.type === "audio" && it.path) {
+      const box = stage.createDiv({ cls: "ghub-stage-audio" });
+      const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
+      setIcon(ic, "music");
+      box.createDiv({ cls: "ghub-stage-audio-name", text: it.fileName ?? "" });
+      box.createEl("audio", {
+        attr: {
+          src: this.app.vault.adapter.getResourcePath(it.path),
+          controls: "true",
+          autoplay: "true",
+        },
+      });
     } else if (it.type === "link" && it.url) {
       const box = stage.createDiv({ cls: "ghub-stage-link" });
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
@@ -63,11 +75,24 @@ export class DetailModal extends Modal {
     const head = bar.createDiv({ cls: "ghub-d-head" });
     const typeBadge = head.createSpan({ cls: "ghub-d-type" });
     const typeIcon =
-      it.type === "image" ? "image" : it.type === "video" ? "film" : "link";
+      it.type === "image"
+        ? "image"
+        : it.type === "video"
+          ? "film"
+          : it.type === "audio"
+            ? "music"
+            : "link";
     const ticon = typeBadge.createSpan();
     setIcon(ticon, typeIcon);
     typeBadge.createSpan({
-      text: it.type === "image" ? "图片" : it.type === "video" ? "视频" : "链接",
+      text:
+        it.type === "image"
+          ? "图片"
+          : it.type === "video"
+            ? "视频"
+            : it.type === "audio"
+              ? "音频"
+              : "链接",
     });
     const headActions = head.createDiv({ cls: "ghub-d-actions" });
     if (it.path) {

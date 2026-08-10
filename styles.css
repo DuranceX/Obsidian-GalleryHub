@@ -435,6 +435,65 @@
   flex-shrink: 0;
 }
 
+/* ---- 音频卡片 ---- */
+.ghub-audiobox {
+  aspect-ratio: 4 / 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background: radial-gradient(
+    ellipse at center,
+    var(--ghub-panel-2),
+    var(--ghub-panel)
+  );
+}
+
+.ghub-audiobox-icon {
+  --icon-size: 30px;
+  color: var(--ghub-muted);
+  display: flex;
+}
+
+.ghub-audio-player {
+  width: 100%;
+  max-width: 210px;
+  height: 30px;
+}
+
+/* 详情舞台音频 */
+.ghub-stage-audio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: var(--ghub-muted);
+  width: min(70%, 420px);
+}
+
+.ghub-stage-audio .ghub-linkbox-icon {
+  --icon-size: 48px;
+}
+
+.ghub-stage-audio-name {
+  font-size: 13px;
+  word-break: break-all;
+  text-align: center;
+}
+
+.ghub-stage-audio audio {
+  width: 100%;
+}
+
+/* 画布音频节点 */
+.ghub-cnode-audio audio {
+  width: 90%;
+  height: 28px;
+  margin-top: 4px;
+}
+
 /* ---- 链接卡片 ---- */
 .ghub-linkbox {
   aspect-ratio: 4 / 3;

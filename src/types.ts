@@ -1,6 +1,6 @@
 /** 与 docs/03-数据设计.md 对应的类型契约 */
 
-export type ItemType = "image" | "video" | "link";
+export type ItemType = "image" | "video" | "audio" | "link";
 
 /** 插件颜色模式 */
 export type ColorMode = "light" | "dark" | "follow";
@@ -146,11 +146,13 @@ export function emptyData(): GalleryData {
 
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"];
 const VIDEO_EXTS = ["mp4", "webm", "mov", "m4v", "ogv"];
+const AUDIO_EXTS = ["mp3", "wav", "flac", "ogg", "m4a", "aac", "opus"];
 
 export function typeFromExt(ext: string): ItemType | null {
   const e = ext.toLowerCase();
   if (IMAGE_EXTS.includes(e)) return "image";
   if (VIDEO_EXTS.includes(e)) return "video";
+  if (AUDIO_EXTS.includes(e)) return "audio";
   return null;
 }
 
