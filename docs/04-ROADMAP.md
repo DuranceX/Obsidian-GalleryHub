@@ -1,8 +1,8 @@
 # 04 ROADMAP
 
 > 项目:GalleryHub —— Obsidian 美术资产画廊插件
-> 日期:2026-08-10
-> 状态:草案
+> 日期:2026-08-10(最后更新:2026-08-10,V0/V1 已实现)
+> 状态:进行中 —— **当前进度:V1 已完成,待用户验收;下一步 V2**
 
 ## 总览
 
@@ -18,11 +18,11 @@ V0 工程搭建 ──► V1 画廊骨架(MVP) ──► V2 画布模式 ──�
 
 **目标**:空插件在 Obsidian 中加载成功,开发环境闭环。
 
-- [ ] 初始化 Git 仓库、TypeScript + esbuild 工程(参照官方 sample plugin)
-- [ ] manifest.json(id: `gallery-hub`,minAppVersion 锁定)
-- [ ] deploy 脚本:产物输出至 `Obsidian/.obsidian/plugins/gallery-hub/`
-- [ ] Hot-Reload 开发流程验证
-- [ ] 空 ItemView + ribbon 图标可打开
+- [x] 初始化 Git 仓库、TypeScript + esbuild 工程(参照官方 sample plugin)
+- [x] manifest.json(id: `gallery-hub`,minAppVersion 1.5.0)
+- [x] deploy 脚本:产物输出至 `Obsidian/.obsidian/plugins/gallery-hub/`
+- [x] Hot-Reload 开发流程:`npm run dev` 直接输出到插件目录(热重载插件待用户安装后验证)
+- [x] ItemView + ribbon 图标可打开(V0 与 V1 一并交付,未单独发空视图版本)
 
 **验收**:Obsidian 里点击图标打开一个空白 GalleryHub 标签页;改一行代码保存后界面自动刷新。
 
@@ -32,18 +32,19 @@ V0 工程搭建 ──► V1 画廊骨架(MVP) ──► V2 画布模式 ──�
 
 **目标**:资产能入库、能浏览、能编辑元数据 —— 达到"可以开始搬资产进来"的状态。
 
-- [ ] store.ts:gallery.json 读写(防抖 + .bak 备份 + 损坏保护)
-- [ ] 首次启动自动创建 `GalleryHub/` 目录与空 gallery.json
-- [ ] 网格画廊:图片/视频缩略卡片,IntersectionObserver 懒加载
-- [ ] 视频卡片:preload=metadata 显示首帧,悬停播放
-- [ ] 链接卡片:标题 + 域名展示
-- [ ] 筛选栏:类型 / 标签多选 / 评分;搜索框(标题、prompt、备注)
-- [ ] 详情面板:查看与编辑全部元数据,写回 JSON
-- [ ] 一键复制 prompt / negativePrompt
-- [ ] 手动添加条目:选择仓库内文件 or 粘贴 URL
-- [ ] 手动导入:系统文件选择 → 复制到 assets/{yyyy-MM}/ → 重命名为 id → 入库
+- [x] store.ts:gallery.json 读写(防抖 500ms + 会话首写 .bak 备份 + 损坏时只读保护 + 版本高于插件时只读)
+- [x] 首次启动自动创建 `GalleryHub/` + `assets/` 目录与空 gallery.json
+- [x] 网格画廊:图片/视频缩略卡片,IntersectionObserver 懒加载(rootMargin 300px)
+- [x] 视频卡片:懒加载 metadata 显示首帧,悬停播放/移出暂停
+- [x] 链接卡片:🔗 + 域名展示;Ctrl/Cmd+点击直接打开链接
+- [x] 筛选栏:类型 / 标签多选(chip 交集筛选)/ 评分下限;搜索框(标题、prompt、备注、原文件名)
+- [x] 详情面板(Modal):查看与编辑标题/标签/评分/来源/prompt/模型/seed/备注,即改即存
+- [x] 一键复制 prompt(negativePrompt 在面板中可见可编辑,复制按钮暂只做 prompt)
+- [x] 手动添加条目:命令「将当前文件登记到画廊」(原地登记不复制)/ 弹窗粘贴 URL
+- [x] 手动导入:文件选择器或**拖拽文件进视图**(拖拽导入原计划 V3,已提前交付)→ 复制到 assets/{yyyy-MM}/{id}.ext → 入库
+- [x] 外部修改检测:gallery.json 被 OneDrive 等外部改动时自动重载并提示
 
-**验收**:导入 50 张图 + 10 个视频 + 5 条链接;按标签筛出目标;编辑一条 prompt 后重启 Obsidian 数据仍在;OneDrive 同步到另一设备后正常显示。
+**验收**(待用户执行):导入 50 张图 + 10 个视频 + 5 条链接;按标签筛出目标;编辑一条 prompt 后重启 Obsidian 数据仍在;OneDrive 同步到另一设备后正常显示。
 
 ---
 
@@ -66,7 +67,7 @@ V0 工程搭建 ──► V1 画廊骨架(MVP) ──► V2 画布模式 ──�
 
 **目标**:把"入库"这个动作的成本降到接近零。
 
-- [ ] 拖拽文件/多文件进视图 → 自动导入入库
+- [x] 拖拽文件/多文件进视图 → 自动导入入库(已随 V1 提前交付)
 - [ ] png-meta.ts:解析 A1111 `parameters` 文本 → 自动填 prompt/negative/seed/steps/cfg/sampler/model
 - [ ] 解析 ComfyUI `prompt`/`workflow` JSON → 提取正负提示词与模型,其余进 gen.extra
 - [ ] sha256 重复检测,重复文件提示跳过或仅登记

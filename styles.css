@@ -1,0 +1,230 @@
+/* ===== GalleryHub ===== */
+
+.ghub-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+  overflow-y: auto;
+}
+
+.ghub-root.ghub-dragging {
+  outline: 2px dashed var(--interactive-accent);
+  outline-offset: -6px;
+}
+
+/* ---- 工具栏 ---- */
+.ghub-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--background-primary);
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-wrap: wrap;
+}
+
+.ghub-search {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+
+.ghub-spacer {
+  flex: 1;
+}
+
+/* ---- 标签栏 ---- */
+.ghub-tagbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 12px;
+}
+
+.ghub-tag {
+  font-size: var(--font-ui-smaller);
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ghub-tag:hover {
+  background: var(--background-modifier-hover);
+}
+
+.ghub-tag.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.ghub-tag-clear {
+  border-style: dashed;
+}
+
+.ghub-count {
+  padding: 2px 14px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+/* ---- 网格 ---- */
+.ghub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 4px 12px 24px;
+}
+
+.ghub-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 48px 12px;
+  color: var(--text-muted);
+}
+
+/* ---- 卡片 ---- */
+.ghub-card {
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.ghub-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-s);
+}
+
+.ghub-thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: var(--background-primary-alt);
+}
+
+.ghub-thumb img,
+.ghub-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ghub-badge {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.ghub-linkbox {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ghub-linkbox-icon {
+  font-size: 32px;
+}
+
+.ghub-linkbox-domain {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ghub-card-meta {
+  padding: 6px 8px 8px;
+}
+
+.ghub-card-title {
+  font-size: var(--font-ui-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ghub-card-sub {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 2px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.ghub-stars {
+  color: var(--color-yellow);
+  letter-spacing: -1px;
+}
+
+.ghub-flag {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: bold;
+}
+
+.ghub-card-tags {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 详情弹窗 ---- */
+.ghub-detail {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.ghub-detail-preview {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.ghub-detail-preview img,
+.ghub-detail-preview video {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 6px;
+}
+
+.ghub-detail-link {
+  word-break: break-all;
+}
+
+.ghub-textarea {
+  width: 100%;
+  resize: vertical;
+  margin-bottom: 8px;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+}
+
+.ghub-detail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}

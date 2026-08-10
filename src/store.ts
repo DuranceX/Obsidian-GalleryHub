@@ -1,0 +1,199 @@
+import { App, Notice, normalizePath } from "obsidian";
+import {
+  GalleryData,
+  GalleryItem,
+  SCHEMA_VERSION,
+  emptyData,
+} from "./types";
+
+export const ROOT_DIR = "GalleryHub";
+export const DB_PATH = `${ROOT_DIR}/gallery.json`;
+export const BAK_PATH = `${ROOT_DIR}/gallery.json.bak`;
+export const ASSETS_DIR = `${ROOT_DIR}/assets`;
+
+const SAVE_DEBOUNCE_MS = 500;
+
+/**
+ * 数据层:gallery.json 的唯一读写入口。
+ * - 防抖保存,写前每会话备份一次 .bak
+ * - JSON 损坏时进入只读模式,绝不覆盖
+ * - 变更通过订阅回调通知 UI
+ */
+export class GalleryStore {
+  private app: App;
+  private data: GalleryData = emptyData();
+  private listeners = new Set<() => void>();
+  private saveTimer: number | null = null;
+  private backedUpThisSession = false;
+  /** 本插件自己写文件时置位,用于区分外部修改 */
+  private selfWriting = false;
+  readOnly = false;
+  loaded = false;
+
+  constructor(app: App) {
+    this.app = app;
+  }
+
+  // ---------- 生命周期 ----------
+
+  async init(): Promise<void> {
+    const ad = this.app.vault.adapter;
+    if (!(await ad.exists(normalizePath(ROOT_DIR)))) {
+      await ad.mkdir(normalizePath(ROOT_DIR));
+    }
+    if (!(await ad.exists(normalizePath(ASSETS_DIR)))) {
+      await ad.mkdir(normalizePath(ASSETS_DIR));
+    }
+    if (!(await ad.exists(normalizePath(DB_PATH)))) {
+      this.data = emptyData();
+      await this.writeNow();
+      this.loaded = true;
+      return;
+    }
+    await this.load();
+  }
+
+  async load(): Promise<void> {
+    const ad = this.app.vault.adapter;
+    try {
+      const raw = await ad.read(normalizePath(DB_PATH));
+      const parsed = JSON.parse(raw) as GalleryData;
+      if (typeof parsed.version !== "number" || !Array.isArray(parsed.items)) {
+        throw new Error("结构不完整");
+      }
+      if (parsed.version > SCHEMA_VERSION) {
+        this.readOnly = true;
+        new Notice(
+          `GalleryHub:数据版本 v${parsed.version} 高于插件支持的 v${SCHEMA_VERSION},进入只读模式,请升级插件。`,
+          8000
+        );
+      }
+      // 跳过损坏条目
+      parsed.items = parsed.items.filter(
+        (it) => it && it.id && it.type && it.createdAt
+      );
+      this.data = parsed;
+      this.loaded = true;
+      this.readOnly = this.readOnly || false;
+      this.emit();
+    } catch (e) {
+      this.readOnly = true;
+      this.loaded = false;
+      new Notice(
+        `GalleryHub:gallery.json 读取失败(${(e as Error).message})。已进入只读模式,请检查文件或从 gallery.json.bak 恢复。`,
+        0
+      );
+    }
+  }
+
+  /** 外部(如 OneDrive 同步)修改了 db 文件时调用 */
+  isSelfWriting(): boolean {
+    return this.selfWriting;
+  }
+
+  // ---------- 订阅 ----------
+
+  onChange(fn: () => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+
+  private emit(): void {
+    for (const fn of this.listeners) fn();
+  }
+
+  // ---------- 读 ----------
+
+  getItems(): readonly GalleryItem[] {
+    return this.data.items;
+  }
+
+  getItem(id: string): GalleryItem | undefined {
+    return this.data.items.find((it) => it.id === id);
+  }
+
+  allTags(): string[] {
+    const set = new Set<string>();
+    for (const it of this.data.items) for (const t of it.tags) set.add(t);
+    return [...set].sort((a, b) => a.localeCompare(b, "zh"));
+  }
+
+  // ---------- 写 ----------
+
+  addItem(item: GalleryItem): void {
+    if (this.guardReadOnly()) return;
+    this.data.items.push(item);
+    this.data.items.sort((a, b) => a.id.localeCompare(b.id)); // 稳定排序,减小同步 diff
+    this.emit();
+    this.scheduleSave();
+  }
+
+  updateItem(id: string, patch: Partial<GalleryItem>): void {
+    if (this.guardReadOnly()) return;
+    const it = this.getItem(id);
+    if (!it) return;
+    Object.assign(it, patch, { modifiedAt: new Date().toISOString() });
+    this.emit();
+    this.scheduleSave();
+  }
+
+  deleteItem(id: string): void {
+    if (this.guardReadOnly()) return;
+    const idx = this.data.items.findIndex((it) => it.id === id);
+    if (idx < 0) return;
+    this.data.items.splice(idx, 1);
+    this.emit();
+    this.scheduleSave();
+  }
+
+  private guardReadOnly(): boolean {
+    if (this.readOnly) {
+      new Notice("GalleryHub 处于只读模式,修改未保存。");
+      return true;
+    }
+    return false;
+  }
+
+  // ---------- 持久化 ----------
+
+  private scheduleSave(): void {
+    if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
+    this.saveTimer = window.setTimeout(() => {
+      this.saveTimer = null;
+      void this.writeNow();
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  /** 供插件卸载时强制落盘 */
+  async flush(): Promise<void> {
+    if (this.saveTimer !== null) {
+      window.clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+      await this.writeNow();
+    }
+  }
+
+  private async writeNow(): Promise<void> {
+    if (this.readOnly) return;
+    const ad = this.app.vault.adapter;
+    this.selfWriting = true;
+    try {
+      // 每会话首写前备份
+      if (
+        !this.backedUpThisSession &&
+        (await ad.exists(normalizePath(DB_PATH)))
+      ) {
+        const old = await ad.read(normalizePath(DB_PATH));
+        await ad.write(normalizePath(BAK_PATH), old);
+        this.backedUpThisSession = true;
+      }
+      const json = JSON.stringify(this.data, null, 2);
+      await ad.write(normalizePath(DB_PATH), json);
+    } catch (e) {
+      new Notice(`GalleryHub:保存失败 ${(e as Error).message}`, 8000);
+    } finally {
+      // 延迟复位,躲过 vault modify 事件的回调时序
+      window.setTimeout(() => (this.selfWriting = false), 200);
+    }
+  }
+}

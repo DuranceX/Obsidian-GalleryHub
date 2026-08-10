@@ -1,6 +1,5 @@
 node_modules/
 dist/
-main.js
 *.js.map
 .env
 .DS_Store
