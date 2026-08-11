@@ -243,6 +243,9 @@ export class CanvasBoard {
     // 这样"捏合缩放后立刻平移"能凭 ctrlKey 立即切换,不会残留缩放模式。
     let panLatch: boolean | null = null; // null=未判定;true=平移;false=缩放
     let wheelIdleTimer: number | null = null;
+    // 会话级设备记忆:一旦出现任一触摸板特征事件即认定为触摸板,此后 non-ctrl 一律平移。
+    // 免疫单次事件数值巧合(如快速平移时 wheelDeltaY 恰为 120 倍数、或纯水平移动时 deltaY=0)。
+    let trackpadSeen = false;
     const WHEEL_GESTURE_IDLE = 120; // ms:超过此静默期视为新手势,允许重新判定
     this.detachFns.push(() => {
       if (wheelIdleTimer !== null) window.clearTimeout(wheelIdleTimer);
@@ -266,13 +269,18 @@ export class CanvasBoard {
         } else {
           // non-ctrl:手势起始判定一次并锁存,手势中途不改判
           if (panLatch === null) {
-            // wheelDeltaY 存在且非 120 倍数 → 触摸板(平移);否则鼠标滚轮(缩放)
+            // 触摸板特征(实测数据验证):
+            // 1. deltaX ≠ 0 —— 鼠标滚轮不产生横向分量,这是最强证据;
+            //    且纯水平双指移动时 deltaY=0、wheelDeltaY=0,只能靠 deltaX 识别
+            // 2. wheelDeltaY 存在且非 120 倍数 —— 鼠标每刻度恒为 120 的整数倍
             const wdy = (e as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY;
-            panLatch =
+            const looksTrackpad =
               e.deltaMode === 0 &&
-              wdy !== undefined &&
-              wdy !== 0 &&
-              Math.abs(wdy) % 120 !== 0;
+              (e.deltaX !== 0 ||
+                (wdy !== undefined && wdy !== 0 && Math.abs(wdy) % 120 !== 0));
+            if (looksTrackpad) trackpadSeen = true;
+            // 会话内已确认过触摸板 → 此后 non-ctrl 一律平移,免疫数值巧合
+            panLatch = trackpadSeen || looksTrackpad;
           }
           doPan = panLatch;
           // 静默一段时间后结束当前手势,下次重新判定
