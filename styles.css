@@ -23,9 +23,10 @@
   --ghub-text: #e8e6e3;
   --ghub-muted: #9a9791;
   --ghub-faint: #7d7a74;
-  --ghub-accent: #e8b04b;
-  --ghub-accent-hover: #f0be62;
-  --ghub-on-accent: #14120c;
+  /* 用户自定义强调色(--ghub-accent-user 等)优先,留空则用主题默认 */
+  --ghub-accent: var(--ghub-accent-user, #e8b04b);
+  --ghub-accent-hover: var(--ghub-accent-hover-user, #f0be62);
+  --ghub-on-accent: var(--ghub-on-accent-user, #14120c);
   --ghub-star-off: #3a3e46;
   --ghub-danger: #e06c5b;
   --ghub-danger-bg: rgba(224, 108, 91, 0.12);
@@ -46,9 +47,10 @@
   --ghub-text: #1a1a1a;
   --ghub-muted: #6b6862;
   --ghub-faint: #807d76;
-  --ghub-accent: #a16207;
-  --ghub-accent-hover: #8a5406;
-  --ghub-on-accent: #ffffff;
+  /* 用户自定义强调色(--ghub-accent-user 等)优先,留空则用主题默认 */
+  --ghub-accent: var(--ghub-accent-user, #a16207);
+  --ghub-accent-hover: var(--ghub-accent-hover-user, #8a5406);
+  --ghub-on-accent: var(--ghub-on-accent-user, #ffffff);
   --ghub-star-off: #d8d5cf;
   --ghub-danger: #c2402e;
   --ghub-danger-bg: rgba(194, 64, 46, 0.08);

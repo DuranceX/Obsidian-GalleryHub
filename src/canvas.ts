@@ -228,21 +228,76 @@ export class CanvasBoard {
     host.addEventListener("pointerup", endPointer);
     host.addEventListener("pointercancel", endPointer);
 
-    // ---- 缩放:滚轮,以指针为中心 ----
+    // ---- 滚轮 / 触摸板 ----
+    // 三种意图:鼠标滚轮→缩放(行为不变);触摸板捏合→缩放;触摸板双指移动→平移。
+    //
+    // 设备识别(参考 Figma/tldraw 等做法):鼠标滚轮每个物理刻度的 wheelDeltaY 恒为
+    // 120 的整数倍(WHEEL_DELTA 标准),触摸板则是任意细碎值。故 wheelDeltaY 非 120
+    // 倍数即判为触摸板。
+    //
+    // 抖动来自"逐事件判定":垂直滚动时 deltaX 会间歇为 0、deltaY 会间歇为整数,
+    // 同一次连续手势会在平移/缩放间反复横跳。
+    // 但捏合缩放带 ctrlKey=true、平移带 ctrlKey=false,ctrlKey 是每事件可靠的即时信号,
+    // 故捏合无需锁存;锁存只用于无法即时区分的 non-ctrl 场景(触摸板平移 vs 鼠标滚轮缩放)。
+    // 这样"捏合缩放后立刻平移"能凭 ctrlKey 立即切换,不会残留缩放模式。
+    let panLatch: boolean | null = null; // null=未判定;true=平移;false=缩放
+    let wheelIdleTimer: number | null = null;
+    const WHEEL_GESTURE_IDLE = 120; // ms:超过此静默期视为新手势,允许重新判定
+    this.detachFns.push(() => {
+      if (wheelIdleTimer !== null) window.clearTimeout(wheelIdleTimer);
+    });
+
     host.addEventListener(
       "wheel",
       (e) => {
         e.preventDefault();
-        const rect = host.getBoundingClientRect();
-        const px = e.clientX - rect.left;
-        const py = e.clientY - rect.top;
-        const factor = Math.exp(-e.deltaY * 0.0015);
-        const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.scale * factor));
-        const k = next / this.scale;
-        // 指针下的世界点保持不动
-        this.tx = px - (px - this.tx) * k;
-        this.ty = py - (py - this.ty) * k;
-        this.scale = next;
+
+        let doPan: boolean;
+        if (e.ctrlKey || e.metaKey) {
+          // 捏合手势 / Ctrl+滚轮:即时缩放,并清除平移锁存,
+          // 使紧接其后的平移手势能立即重新判定
+          doPan = false;
+          panLatch = null;
+          if (wheelIdleTimer !== null) {
+            window.clearTimeout(wheelIdleTimer);
+            wheelIdleTimer = null;
+          }
+        } else {
+          // non-ctrl:手势起始判定一次并锁存,手势中途不改判
+          if (panLatch === null) {
+            // wheelDeltaY 存在且非 120 倍数 → 触摸板(平移);否则鼠标滚轮(缩放)
+            const wdy = (e as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY;
+            panLatch =
+              e.deltaMode === 0 &&
+              wdy !== undefined &&
+              wdy !== 0 &&
+              Math.abs(wdy) % 120 !== 0;
+          }
+          doPan = panLatch;
+          // 静默一段时间后结束当前手势,下次重新判定
+          if (wheelIdleTimer !== null) window.clearTimeout(wheelIdleTimer);
+          wheelIdleTimer = window.setTimeout(() => {
+            panLatch = null;
+            wheelIdleTimer = null;
+          }, WHEEL_GESTURE_IDLE);
+        }
+
+        if (doPan) {
+          this.tx -= e.deltaX;
+          this.ty -= e.deltaY;
+        } else {
+          // 以指针为中心缩放
+          const rect = host.getBoundingClientRect();
+          const px = e.clientX - rect.left;
+          const py = e.clientY - rect.top;
+          const factor = Math.exp(-e.deltaY * 0.0015);
+          const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.scale * factor));
+          const k = next / this.scale;
+          // 指针下的世界点保持不动
+          this.tx = px - (px - this.tx) * k;
+          this.ty = py - (py - this.ty) * k;
+          this.scale = next;
+        }
         this.applyTransform();
       },
       { passive: false }

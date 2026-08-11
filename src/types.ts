@@ -15,6 +15,8 @@ export type SortMode =
 
 export interface GalleryHubSettings {
   colorMode: ColorMode;
+  /** 主题强调色(hex,如 "#e8b04b");空 = 用当前明暗主题的默认强调色 */
+  accentColor: string;
   /** 界面语言:auto = 跟随 Obsidian */
   language: "auto" | "zh" | "en";
   /** 数据文件夹(仓库相对路径):在此目录下初始化 gallery.json 与 assets/,默认 "GalleryHub" */
@@ -31,6 +33,7 @@ export interface GalleryHubSettings {
 
 export const DEFAULT_SETTINGS: GalleryHubSettings = {
   colorMode: "dark",
+  accentColor: "",
   language: "auto",
   dataFolder: "GalleryHub",
   showFolders: true,

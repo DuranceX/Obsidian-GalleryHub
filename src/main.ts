@@ -22,6 +22,7 @@ export default class GalleryHubPlugin extends Plugin {
   async onload(): Promise<void> {
     await this.loadSettings();
     this.applyLocale();
+    this.applyAccent();
     setDataRoot(this.settings.dataFolder);
     this.store = new GalleryStore(this.app);
     this.importer = new Importer(this.app, this.store);
@@ -95,6 +96,10 @@ export default class GalleryHubPlugin extends Plugin {
   }
 
   async onunload(): Promise<void> {
+    // 清除注入到 body 的强调色变量,避免禁用后残留
+    document.body.style.removeProperty("--ghub-accent-user");
+    document.body.style.removeProperty("--ghub-accent-hover-user");
+    document.body.style.removeProperty("--ghub-on-accent-user");
     await this.store.flush();
   }
 
@@ -132,6 +137,26 @@ export default class GalleryHubPlugin extends Plugin {
     }
   }
 
+  /**
+   * 应用用户自定义强调色:注入到 document.body 的 CSS 变量,
+   * 经继承链对主视图(.ghub-root)与所有弹窗(.ghub-detail-modal)同时生效。
+   * 留空则清除覆盖,回落到明暗主题各自的默认强调色。
+   */
+  applyAccent(): void {
+    const s = document.body.style;
+    const hex = normalizeHex(this.settings.accentColor);
+    if (!hex) {
+      s.removeProperty("--ghub-accent-user");
+      s.removeProperty("--ghub-accent-hover-user");
+      s.removeProperty("--ghub-on-accent-user");
+      return;
+    }
+    s.setProperty("--ghub-accent-user", hex);
+    // hover 略微提亮;accent 底上的文字色按亮度选深/浅,保证对比度
+    s.setProperty("--ghub-accent-hover-user", lightenHex(hex, 0.12));
+    s.setProperty("--ghub-on-accent-user", isLightColor(hex) ? "#14120c" : "#ffffff");
+  }
+
   /** 侧边栏模块开关变化后刷新所有已打开视图 */
   refreshViews(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GALLERY)) {
@@ -164,6 +189,47 @@ export default class GalleryHubPlugin extends Plugin {
     }
     void workspace.revealLeaf(leaf);
   }
+}
+
+// ---------- 颜色工具 ----------
+
+/** 规范化为 #rrggbb;非法/空返回 "" */
+function normalizeHex(input: string): string {
+  const v = (input || "").trim();
+  if (!v) return "";
+  let m = /^#?([0-9a-fA-F]{6})$/.exec(v);
+  if (m) return `#${m[1].toLowerCase()}`;
+  // 支持 #rgb 简写
+  m = /^#?([0-9a-fA-F]{3})$/.exec(v);
+  if (m) {
+    const [r, g, b] = m[1];
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return "";
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
+  ];
+}
+
+/** 相对亮度(sRGB 感知加权),> 0.6 视为浅色 */
+function isLightColor(hex: string): boolean {
+  const [r, g, b] = hexToRgb(hex);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6;
+}
+
+/** 朝白色方向提亮 amount(0~1) */
+function lightenHex(hex: string, amount: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  const up = (c: number) => Math.round(c + (255 - c) * amount);
+  const to2 = (c: number) => up(c).toString(16).padStart(2, "0");
+  return `#${to2(r)}${to2(g)}${to2(b)}`;
 }
 
 class GalleryHubSettingTab extends PluginSettingTab {
@@ -206,6 +272,34 @@ class GalleryHubSettingTab extends PluginSettingTab {
             this.plugin.settings.colorMode = v as GalleryHubSettings["colorMode"];
             await this.plugin.saveSettings();
             this.plugin.applyThemeToViews();
+            this.display(); // 主题默认色变了,刷新取色器回显
+          })
+      );
+
+    // 主题色:留空跟随主题,取色器回显当前生效色
+    const themeDefaultAccent =
+      this.plugin.themeClass() === "ghub-theme-dark" ? "#e8b04b" : "#a16207";
+    new Setting(containerEl)
+      .setName(t("settingAccentColor"))
+      .setDesc(t("settingAccentColorDesc"))
+      .addColorPicker((cp) =>
+        cp
+          .setValue(this.plugin.settings.accentColor || themeDefaultAccent)
+          .onChange(async (v) => {
+            this.plugin.settings.accentColor = v;
+            await this.plugin.saveSettings();
+            this.plugin.applyAccent();
+          })
+      )
+      .addExtraButton((b) =>
+        b
+          .setIcon("rotate-ccw")
+          .setTooltip(t("accentReset"))
+          .onClick(async () => {
+            this.plugin.settings.accentColor = "";
+            await this.plugin.saveSettings();
+            this.plugin.applyAccent();
+            this.display(); // 回显恢复到主题默认色
           })
       );
 
