@@ -5,6 +5,7 @@ import { t } from "./i18n";
 import { DetailModal } from "./detail";
 import { Importer } from "./importer";
 import { ThumbCache } from "./thumbs";
+import { targetIcon } from "./resource";
 
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 8;
@@ -892,14 +893,14 @@ export class CanvasBoard {
     } else if (it.type === "note") {
       const box = node.createDiv({ cls: "ghub-cnode-link ghub-cnode-note" });
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
-      setIcon(ic, "sticky-note");
+      setIcon(ic, "type");
       box.createDiv({ text: it.title || "", cls: "ghub-cnode-link-t" });
       if (it.note)
         box.createDiv({ text: it.note, cls: "ghub-cnode-note-body" });
     } else if (it.type === "link") {
       const box = node.createDiv({ cls: "ghub-cnode-link" });
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
-      setIcon(ic, "link");
+      setIcon(ic, targetIcon(it.url ?? ""));
       box.createDiv({ text: it.title || it.url || "", cls: "ghub-cnode-link-t" });
     }
 

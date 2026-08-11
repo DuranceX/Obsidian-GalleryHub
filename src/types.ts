@@ -69,10 +69,13 @@ export interface GalleryItem {
   type: ItemType;
   createdAt: string;
   modifiedAt: string;
-  /** image/video:仓库相对路径 */
+  /** image/video/audio:复制进 assets 后的仓库相对路径 */
   path?: string;
-  /** link:外部 URL */
+  /** link:目标地址,可为 http(s) 网址 / 仓库相对路径 / 系统绝对路径 */
   url?: string;
+  /** link 专用:逻辑归属文件夹(assets 相对路径形式,"" / undefined = 根)。
+   *  link 卡片无物理文件,归属与文件位置解耦,仅用于画廊内文件夹分类。 */
+  folder?: string;
   /** 导入前原始文件名 */
   fileName?: string;
   hash?: string | null;

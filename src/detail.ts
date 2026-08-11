@@ -1,7 +1,8 @@
-import { App, Modal, Notice, TFile, setIcon } from "obsidian";
+import { App, Modal, Notice, TFile, FuzzySuggestModal, setIcon } from "obsidian";
 import { t } from "./i18n";
 import { GalleryStore } from "./store";
 import { GalleryItem } from "./types";
+import { openResource, targetIcon, classifyTarget } from "./resource";
 
 /** AI 参数分区折叠状态:模块级,跨卡片、跨弹窗同步(会话内记忆) */
 let genSectionCollapsed = false;
@@ -181,8 +182,12 @@ export class DetailModal extends Modal {
     } else if (it.type === "link" && it.url) {
       const box = stage.createDiv({ cls: "ghub-stage-link" });
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
-      setIcon(ic, "link");
-      box.createEl("a", { text: it.url, attr: { href: it.url } });
+      setIcon(ic, targetIcon(it.url));
+      const a = box.createEl("a", { text: it.url, attr: { href: "#" } });
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        void openResource(this.app, it.url!);
+      });
     } else if (it.type === "note") {
       // 笔记:舞台即编辑区,大文本框直改 note 字段
       const box = stage.createDiv({ cls: "ghub-stage-note" });
@@ -208,8 +213,8 @@ export class DetailModal extends Modal {
           : it.type === "audio"
             ? "music"
             : it.type === "note"
-              ? "sticky-note"
-              : "link";
+              ? "type"
+              : targetIcon(it.url ?? "");
     const ticon = typeBadge.createSpan();
     setIcon(ticon, typeIcon);
     typeBadge.createSpan({
@@ -235,8 +240,11 @@ export class DetailModal extends Modal {
       });
     }
     if (it.type === "link" && it.url) {
-      this.iconBtn(headActions, "external-link", t("openInBrowser"), () =>
-        window.open(it.url)
+      const kind = classifyTarget(it.url);
+      const label = kind === "url" ? t("openInBrowser") : t("openTarget");
+      const icon = kind === "url" ? "external-link" : targetIcon(it.url);
+      this.iconBtn(headActions, icon, label, () =>
+        void openResource(this.app, it.url!)
       );
     }
     const delBtn = this.iconBtn(
@@ -521,31 +529,27 @@ export class FolderPickModal extends Modal {
     const bar = this.contentEl.createDiv({ cls: "ghub-panelbar" });
     bar.createEl("h3", { text: this.title });
 
-    if (this.folders.length) {
-      const list = bar.createDiv({ cls: "ghub-folderlist" });
-      for (const f of this.folders) {
-        const row = list.createDiv({
-          cls: "ghub-folder-row",
-          attr: { role: "button", tabindex: "0" },
-        });
-        const ic = row.createSpan({ cls: "ghub-ficon" });
-        setIcon(ic, "folder");
-        row.createSpan({ text: f });
-        const pick = () => {
-          this.onPick(f);
-          this.close();
-        };
-        row.addEventListener("click", pick);
-        row.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") pick();
-        });
-      }
-    } else {
-      bar.createDiv({
-        cls: "ghub-side-empty",
-        text: t("noFoldersYet"),
+    const list = bar.createDiv({ cls: "ghub-folderlist" });
+    const addRow = (folder: string, label: string, icon: string) => {
+      const row = list.createDiv({
+        cls: "ghub-folder-row",
+        attr: { role: "button", tabindex: "0" },
       });
-    }
+      const ic = row.createSpan({ cls: "ghub-ficon" });
+      setIcon(ic, icon);
+      row.createSpan({ text: label });
+      const pick = () => {
+        this.onPick(folder);
+        this.close();
+      };
+      row.addEventListener("click", pick);
+      row.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") pick();
+      });
+    };
+    // 根目录选项:"/" 表示移到 assets 根
+    addRow("", "/", "corner-left-up");
+    for (const f of this.folders) addRow(f, f, "folder");
 
     const f = bar.createDiv({ cls: "ghub-field" });
     f.createDiv({ cls: "ghub-field-label", text: t("newFolderLabel") });
@@ -831,7 +835,7 @@ export class AddLinkModal extends Modal {
     const f1 = bar.createDiv({ cls: "ghub-field" });
     f1.createDiv({ cls: "ghub-field-label" }).createSpan({ text: t("urlLabel") });
     const urlInput = f1.createEl("input", {
-      attr: { type: "text", placeholder: "https://…" },
+      attr: { type: "text", placeholder: "https://…  /  /path/to/file.psd" },
     });
     urlInput.addEventListener("input", () => (url = urlInput.value.trim()));
     const f2 = bar.createDiv({ cls: "ghub-field" });
@@ -863,5 +867,31 @@ export class AddLinkModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
+  }
+}
+
+/** 仓库文件模糊选择器:选中后回调该 TFile(用于生成引用其相对路径的 link 卡片) */
+export class VaultFilePickModal extends FuzzySuggestModal<TFile> {
+  constructor(
+    app: App,
+    themeClass: string,
+    private files: TFile[],
+    private onPick: (file: TFile) => void
+  ) {
+    super(app);
+    this.setPlaceholder(t("pickVaultFileTitle"));
+    this.modalEl.addClass(themeClass);
+  }
+
+  getItems(): TFile[] {
+    return this.files;
+  }
+
+  getItemText(file: TFile): string {
+    return file.path;
+  }
+
+  onChooseItem(file: TFile): void {
+    this.onPick(file);
   }
 }

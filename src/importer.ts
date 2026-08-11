@@ -77,8 +77,31 @@ export class Importer {
     const ext = file.name.split(".").pop() ?? "";
     const type = typeFromExt(ext);
     if (!type) {
-      new Notice(t("unsupportedFormat", { name: file.name }));
-      return null;
+      // 非视觉资产(pdf/psd/canvas/md…):不复制,做成 link 卡片引用原系统路径。
+      // Electron 下 File.path 是系统绝对路径;取不到则跳过。
+      const sysPath = (file as File & { path?: string }).path;
+      if (!sysPath) {
+        new Notice(t("unsupportedFormat", { name: file.name }));
+        return null;
+      }
+      const now = new Date().toISOString();
+      return {
+        id: newId(),
+        type: "link",
+        createdAt: now,
+        modifiedAt: now,
+        url: sysPath,
+        // 导入时若正浏览某文件夹,link 卡片逻辑归属到该文件夹
+        folder: folder || undefined,
+        title: file.name.replace(/\.[^.]+$/, ""),
+        fileName: file.name,
+        note: "",
+        tags: [],
+        rating: 0,
+        source: "",
+        gen: emptyGen(),
+        layouts: {},
+      };
     }
     const id = newId();
     // 目标目录:调用方传入的文件夹(通常为用户当前选中目录),否则 assets 根
@@ -158,19 +181,25 @@ export class Importer {
     return true;
   }
 
-  addLink(url: string, title: string): boolean {
-    if (!/^https?:\/\//i.test(url)) {
-      new Notice(t("enterHttpUrl"));
+  /** 新建链接卡片。target 可为 http(s) 网址 / 仓库相对路径 / 系统绝对路径 */
+  addLink(target: string, title: string): boolean {
+    const url = target.trim();
+    if (!url) {
+      new Notice(t("enterUrlOrPath"));
       return false;
     }
     const now = new Date().toISOString();
+    // 自动标题:网址取域名,路径取文件名
+    const autoTitle = /^https?:\/\//i.test(url)
+      ? url.replace(/^https?:\/\//, "").split("/")[0]
+      : (url.split(/[\\/]/).pop() || url).replace(/\.[^.]+$/, "");
     this.store.addItem({
       id: newId(),
       type: "link",
       createdAt: now,
       modifiedAt: now,
       url,
-      title: title || url.replace(/^https?:\/\//, "").split("/")[0],
+      title: title || autoTitle,
       note: "",
       tags: [],
       rating: 0,
@@ -313,13 +342,22 @@ export class Importer {
       new Notice(t("operationFailed", { msg: (e as Error).message }));
       return null;
     }
-    // 同步库内路径前缀
+    // 同步库内路径前缀(物理文件),以及 link 卡片的逻辑归属字段
     const oldPrefix = `${oldPath}/`;
     for (const it of this.store.getItems()) {
       if (it.path?.startsWith(oldPrefix)) {
         this.store.updateItem(it.id, {
           path: `${newPath}/${it.path.slice(oldPrefix.length)}`,
         });
+      } else if (!it.path && it.folder) {
+        // link 卡片:folder 用 assets 相对路径形式,按 rel → newRel 前缀重映射
+        if (it.folder === rel) {
+          this.store.updateItem(it.id, { folder: newRel });
+        } else if (it.folder.startsWith(`${rel}/`)) {
+          this.store.updateItem(it.id, {
+            folder: `${newRel}${it.folder.slice(rel.length)}`,
+          });
+        }
       }
     }
     return newRel;
@@ -337,9 +375,16 @@ export class Importer {
       return null;
     }
     const prefix = `${path}/`;
+    // 物理文件在该目录下的条目,以及逻辑归属在该文件夹(含子树)的 link 卡片
+    const inSubtree = (folder: string) =>
+      folder === rel || folder.startsWith(`${rel}/`);
     const doomed = this.store
       .getItems()
-      .filter((it) => it.path?.startsWith(prefix))
+      .filter(
+        (it) =>
+          it.path?.startsWith(prefix) ||
+          (!it.path && it.folder && inSubtree(it.folder))
+      )
       .map((it) => it.id);
     try {
       await this.app.vault.trash(f, true);
@@ -353,7 +398,8 @@ export class Importer {
 
   /** 条目所属文件夹:assets 相对路径("角色/机甲"),根下直存文件与库外/链接 → null */
   folderOf(item: GalleryItem): string | null {
-    if (!item.path) return null;
+    // link 卡片无物理文件,用逻辑归属字段
+    if (!item.path) return item.folder?.trim() ? item.folder.trim() : null;
     const prefix = `${ASSETS_DIR}/`;
     if (!item.path.startsWith(prefix)) return null;
     const rest = item.path.slice(prefix.length);
@@ -374,7 +420,15 @@ export class Importer {
 
     let moved = 0;
     for (const it of items) {
-      if (!it.path) continue; // 链接类型无文件
+      if (!it.path) {
+        // link 卡片:无物理文件,只更新逻辑归属字段,不动任何文件
+        const cur = it.folder?.trim() ?? "";
+        if (cur !== folder) {
+          this.store.updateItem(it.id, { folder: folder || undefined });
+          moved++;
+        }
+        continue;
+      }
       const fileName = it.path.split("/").pop()!;
       const dest = normalizePath(`${destDir}/${fileName}`);
       if (dest === it.path) continue;

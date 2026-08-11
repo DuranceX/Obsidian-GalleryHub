@@ -1,13 +1,15 @@
-import { ItemView, WorkspaceLeaf, Menu, Notice, setIcon } from "obsidian";
+import { ItemView, WorkspaceLeaf, Menu, Notice, setIcon, TFile } from "obsidian";
 import { GalleryStore } from "./store";
 import { Importer } from "./importer";
 import { GalleryItem, ItemType, SortMode, GalleryHubSettings } from "./types";
 import { CanvasBoard } from "./canvas";
 import { ThumbCache } from "./thumbs";
 import { t } from "./i18n";
+import { openResource, targetIcon } from "./resource";
 import {
   DetailModal,
   AddLinkModal,
+  VaultFilePickModal,
   FolderPickModal,
   ConfirmDeleteModal,
   ConfirmTrashModal,
@@ -366,7 +368,16 @@ export class GalleryView extends ItemView {
       text: t("importFiles"),
       attr: { "aria-label": t("importFilesAria") },
     });
-    importBtn.addEventListener("click", () => this.pickFiles());
+    importBtn.addEventListener("click", (e) => {
+      const menu = new Menu();
+      menu.addItem((mi) =>
+        mi.setTitle(t("importSystemFiles")).setIcon("hard-drive").onClick(() => this.pickFiles())
+      );
+      menu.addItem((mi) =>
+        mi.setTitle(t("importVaultFile")).setIcon("file-symlink").onClick(() => this.pickVaultFile())
+      );
+      menu.showAtMouseEvent(e as MouseEvent);
+    });
 
     const linkBtn = bar.createEl("button", {
       text: t("addLink"),
@@ -512,8 +523,9 @@ export class GalleryView extends ItemView {
   }
 
   private pickFiles(): void {
+    // 不限扩展名:视觉资产复制进 assets,其余生成 link 卡片引用原路径
     const input = createEl("input", {
-      attr: { type: "file", multiple: "true", accept: "image/*,video/*,audio/*" },
+      attr: { type: "file", multiple: "true" },
     });
     input.addEventListener("change", () => {
       if (input.files?.length)
@@ -523,6 +535,15 @@ export class GalleryView extends ItemView {
         );
     });
     input.click();
+  }
+
+  /** 从仓库内选一个文件,生成引用它的 link 卡片(存相对路径) */
+  private pickVaultFile(): void {
+    const files = this.app.vault.getFiles();
+    new VaultFilePickModal(this.app, this.getTheme(), files, (f) => {
+      if (this.importer.addLink(f.path, f.basename)) new Notice(t("linkAdded"));
+      this.renderGrid();
+    }).open();
   }
 
   // ---------- 多选 ----------
@@ -571,7 +592,8 @@ export class GalleryView extends ItemView {
 
     const move = bar.createEl("button", { text: t("moveTo") });
     move.addEventListener("click", () => {
-      const items = this.selectedItems().filter((it) => it.path);
+      // link 卡片也可移动(仅改逻辑归属),不再按 path 过滤
+      const items = this.selectedItems();
       if (!items.length) {
         new Notice(t("noMovableInSelection"));
         return;
@@ -705,7 +727,7 @@ export class GalleryView extends ItemView {
         ["video", "film", t("video"), all.filter((i) => i.type === "video").length],
         ["audio", "music", t("audio"), all.filter((i) => i.type === "audio").length],
         ["link", "link", t("link"), all.filter((i) => i.type === "link").length],
-        ["note", "sticky-note", t("note"), all.filter((i) => i.type === "note").length],
+        ["note", "type", t("note"), all.filter((i) => i.type === "note").length],
       ];
       for (const [val, icon, label, n] of typeDefs) {
         this.fitem(side, icon, label, n, this.filter.type === val, () => {
@@ -1099,14 +1121,17 @@ export class GalleryView extends ItemView {
 
       const itemIds = dt.getData("application/ghub-items");
       if (itemIds) {
+        // note/link 卡片无物理文件但可移动逻辑归属,故不再按 path 过滤
         const items = itemIds
           .split(",")
           .map((id) => this.store.getItem(id))
-          .filter((it): it is GalleryItem => !!it && !!it.path);
+          .filter((it): it is GalleryItem => !!it);
         if (items.length)
           void this.importer.moveItems(items, rel).then(() => {
             this.clearSelection();
+            this.refreshFolders();
             this.renderSidebar();
+            this.renderGrid(); // 移走的卡片需立即从当前网格消失
           });
         return;
       }
@@ -1350,22 +1375,23 @@ export class GalleryView extends ItemView {
     } else if (it.type === "link") {
       const box = thumb.createDiv({ cls: "ghub-linkbox" });
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
-      setIcon(ic, "link");
+      setIcon(ic, targetIcon(it.url ?? ""));
       const tw = box.createDiv({ cls: "ghub-audiobox-titles" });
       tw.createDiv({ cls: "ghub-audiobox-title", text: it.title || t("noTitle") });
+      // 副标题:网址显示域名,文件路径显示所在目录/文件名
+      let sub = "";
+      const url = it.url ?? "";
       try {
-        tw.createDiv({
-          cls: "ghub-linkbox-domain",
-          text: new URL(it.url ?? "").hostname,
-        });
+        sub = new URL(url).hostname;
       } catch {
-        /* ignore */
+        sub = url.split(/[\\/]/).slice(-2).join("/");
       }
+      if (sub) tw.createDiv({ cls: "ghub-linkbox-domain", text: sub });
     } else if (it.type === "note") {
       const box = thumb.createDiv({ cls: "ghub-notebox" });
       const head = box.createDiv({ cls: "ghub-audiobox-head" });
       const ic = head.createDiv({ cls: "ghub-audiobox-icon" });
-      setIcon(ic, "sticky-note");
+      setIcon(ic, "type");
       head.createDiv({
         cls: "ghub-audiobox-title",
         text: it.title || t("noTitle"),
@@ -1410,7 +1436,7 @@ export class GalleryView extends ItemView {
       ) {
         if (it.type === "link" && this.selected.size === 0 && it.url) {
           // 无选择时 Ctrl+点击链接保留"直接打开"行为
-          window.open(it.url);
+          void openResource(this.app, it.url);
           return;
         }
         this.toggleSelect(it, card);
@@ -1452,11 +1478,11 @@ export class GalleryView extends ItemView {
           this.sendToBoard(targets);
         })
       );
-      const movable = targets.filter((t) => t.path);
-      if (movable.length) {
+      // link 卡片无物理文件,但可移动逻辑归属;故不再按 path 过滤
+      if (targets.length) {
         menu.addItem((mi) =>
           mi.setTitle(t("moveToN", { label: label ? ` (${label})` : "" })).setIcon("folder-input").onClick(() => {
-            void this.moveItemsViaPicker(movable);
+            void this.moveItemsViaPicker(targets);
           })
         );
       }
