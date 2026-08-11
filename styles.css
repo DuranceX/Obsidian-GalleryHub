@@ -62,6 +62,14 @@
   --ghub-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
+/* 输入框光标统一用强调色:暗色模式下默认光标几乎不可见 */
+.ghub-root input,
+.ghub-root textarea,
+.ghub-detail-modal input,
+.ghub-detail-modal textarea {
+  caret-color: var(--ghub-accent) !important;
+}
+
 /* ================= 根布局 =================
    必须压过主题的 .workspace-leaf-content .view-content 底色 */
 .workspace-leaf-content .view-content.ghub-root,

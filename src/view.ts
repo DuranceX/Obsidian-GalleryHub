@@ -926,7 +926,12 @@ export class GalleryView extends ItemView {
       });
       input.value = node.name;
       input.addEventListener("click", (e) => e.stopPropagation());
+      // Enter 提交会 renderGrid 重建 DOM,进而使 input 失焦触发 blur;
+      // 若不去重,blur 会用已失效的旧路径再提交一次,导致"找不到文件夹"。
+      let done = false;
       const commit = async () => {
+        if (done) return;
+        done = true;
         this.renaming = null;
         const name = input.value.trim();
         if (!name || name === node.name) {
@@ -938,12 +943,18 @@ export class GalleryView extends ItemView {
         await this.refreshFolders();
         this.renderGrid();
       };
+      const cancel = () => {
+        if (done) return;
+        done = true;
+        this.renaming = null;
+        this.renderSidebar();
+      };
       input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") void commit();
-        if (e.key === "Escape") {
-          this.renaming = null;
-          this.renderSidebar();
-        }
+        // 阻止冒泡到 row:否则空格/回车会触发 row 的筛选逻辑,导致组合输入被打断
+        e.stopPropagation();
+        // 组合输入(如中文候选词)中的回车用于确认候选,不应完成重命名
+        if (e.key === "Enter" && !e.isComposing) void commit();
+        if (e.key === "Escape") cancel();
       });
       input.addEventListener("blur", () => void commit());
       window.setTimeout(() => {

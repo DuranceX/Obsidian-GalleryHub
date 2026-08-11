@@ -3,20 +3,21 @@ import process from "process";
 import builtins from "builtin-modules";
 import fs from "fs";
 import path from "path";
+import { loadEnv, resolvePluginDir } from "./scripts/vault-dir.mjs";
 
 const prod = process.argv[2] === "production";
 
-// 开发模式:直接输出到 Obsidian 仓库插件目录,配合 Hot-Reload 即改即生效
-const VAULT_PLUGIN_DIR =
-  "C:/Users/Cardy/OneDrive/Mine/Obsidian/.obsidian/plugins/gallery-hub";
-
-const outfile = prod ? "dist/main.js" : path.join(VAULT_PLUGIN_DIR, "main.js");
-
-// 开发模式下确保插件目录存在,并同步 manifest / styles
+// 开发模式:直接输出到 Obsidian 仓库插件目录,配合 Hot-Reload 即改即生效。
+// 目录来自环境变量(见 .env / .env.example),各平台各自配置,不写死路径。
+let outfile = "dist/main.js";
 if (!prod) {
-  fs.mkdirSync(VAULT_PLUGIN_DIR, { recursive: true });
-  fs.copyFileSync("manifest.json", path.join(VAULT_PLUGIN_DIR, "manifest.json"));
-  fs.copyFileSync("styles.css", path.join(VAULT_PLUGIN_DIR, "styles.css"));
+  loadEnv();
+  const vaultPluginDir = resolvePluginDir();
+  fs.mkdirSync(vaultPluginDir, { recursive: true });
+  fs.copyFileSync("manifest.json", path.join(vaultPluginDir, "manifest.json"));
+  fs.copyFileSync("styles.css", path.join(vaultPluginDir, "styles.css"));
+  outfile = path.join(vaultPluginDir, "main.js");
+  console.log(`[dev] 输出到插件目录: ${vaultPluginDir}`);
 }
 
 const context = await esbuild.context({

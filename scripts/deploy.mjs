@@ -1,10 +1,12 @@
 // 将构建成品复制到 Obsidian 仓库的插件目录
 // 用法: npm run build && npm run deploy
+// 目录来自环境变量(见 .env / .env.example),跨平台通用。
 import fs from "fs";
 import path from "path";
+import { loadEnv, resolvePluginDir } from "./vault-dir.mjs";
 
-const VAULT_PLUGIN_DIR =
-  "C:/Users/Cardy/OneDrive/Mine/Obsidian/.obsidian/plugins/gallery-hub";
+loadEnv();
+const VAULT_PLUGIN_DIR = resolvePluginDir();
 
 const files = [
   ["manifest.json", "manifest.json"],
