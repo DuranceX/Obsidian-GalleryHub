@@ -1,0 +1,51 @@
+name: Release
+
+# 推送形如 0.11.3 的版本 tag 时触发:自动构建并发布 GitHub Release
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify version matches tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          MANIFEST_VER=$(node -p "require('./manifest.json').version")
+          if [ "$TAG" != "$MANIFEST_VER" ]; then
+            echo "::error::tag ($TAG) 与 manifest.json version ($MANIFEST_VER) 不一致"
+            exit 1
+          fi
+          echo "版本一致: $TAG"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # 已存在则先删旧 release(保留 tag),便于重跑
+          gh release delete "$TAG" --yes --cleanup-tag=false 2>/dev/null || true
+          gh release create "$TAG" \
+            --title "GalleryHub $TAG" \
+            --notes "详见提交记录与 README。安装:下载 main.js、manifest.json、styles.css 放入 <vault>/.obsidian/plugins/gallery-hub/ 后启用。" \
+            dist/main.js manifest.json styles.css
