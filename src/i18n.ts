@@ -142,6 +142,7 @@ const en = {
   nItems: "{n} items",
 
   // 右键菜单
+  open: "Open",
   editDetail: "Edit details",
   batchEditN: "Batch edit {label}…",
   sendToBoardN: "Send to board{label}",
@@ -410,6 +411,7 @@ const zh: Record<keyof typeof en, string> = {
   currentSuffix: "(当前)",
   nItems: "{n} 项",
 
+  open: "打开",
   editDetail: "编辑详情",
   batchEditN: "批量编辑 {label}…",
   sendToBoardN: "发送到画布{label}",

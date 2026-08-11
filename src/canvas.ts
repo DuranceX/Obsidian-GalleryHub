@@ -5,7 +5,7 @@ import { t } from "./i18n";
 import { DetailModal } from "./detail";
 import { Importer } from "./importer";
 import { ThumbCache } from "./thumbs";
-import { targetIcon } from "./resource";
+import { targetIcon, openItem, canOpen, revealOrigin, canRevealOrigin } from "./resource";
 
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 8;
@@ -1118,6 +1118,16 @@ export class CanvasBoard {
           this.worldEl.insertBefore(node, this.worldEl.firstChild);
         })
       );
+      if (canOpen(it)) {
+        menu.addItem((mi) =>
+          mi.setTitle(t("open")).setIcon("external-link").onClick(() => openItem(this.app, it))
+        );
+      }
+      if (canRevealOrigin(it)) {
+        menu.addItem((mi) =>
+          mi.setTitle(t("openOrigin")).setIcon("folder-open").onClick(() => revealOrigin(this.app, it))
+        );
+      }
       menu.addItem((mi) =>
         mi.setTitle(t("openDetail")).setIcon("info").onClick(() => {
           new DetailModal(this.app, this.store, it, this.getTheme()).open();

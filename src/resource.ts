@@ -1,5 +1,6 @@
 import { App, Notice, TFile } from "obsidian";
 import { t } from "./i18n";
+import { GalleryItem } from "./types";
 
 /** 链接目标的三种来源 */
 export type TargetKind = "url" | "vault" | "system";
@@ -65,4 +66,64 @@ export async function openResource(app: App, target: string): Promise<void> {
   } catch {
     new Notice(t("fileNotFound", { path: s }), 5000);
   }
+}
+
+/**
+ * 打开条目本体:等效详情面板的打开按钮。
+ * link → 智能分发(openResource);其余在 Obsidian 打开库内文件。
+ */
+export function openItem(app: App, it: GalleryItem): void {
+  if (it.type === "link") {
+    if (it.url) void openResource(app, it.url);
+    return;
+  }
+  if (it.path) {
+    const f = app.vault.getAbstractFileByPath(it.path);
+    if (f instanceof TFile) void app.workspace.getLeaf(true).openFile(f);
+    else new Notice(t("fileNotFound", { path: it.path }), 5000);
+  }
+}
+
+/** 该条目是否有可"打开"的目标(用于决定是否显示打开菜单项) */
+export function canOpen(it: GalleryItem): boolean {
+  return it.type === "link" ? !!it.url : !!it.path;
+}
+
+/**
+ * 打开源文件位置:自定义 originPath 优先(URL 开浏览器 / 路径在资源管理器中显示),
+ * 否则把库内文件在资源管理器中显示。
+ */
+export function revealOrigin(app: App, it: GalleryItem): void {
+  const origin = it.originPath?.trim();
+  if (origin) {
+    if (/^https?:\/\//i.test(origin)) {
+      window.open(origin);
+      return;
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { shell } = require("electron");
+      void shell.showItemInFolder(origin);
+    } catch {
+      new Notice(t("cannotOpenPath"), 5000);
+    }
+    return;
+  }
+  if (it.path) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { shell } = require("electron");
+      const adapter = app.vault.adapter as { getFullPath?: (p: string) => string };
+      const full = adapter.getFullPath?.(it.path);
+      if (full) void shell.showItemInFolder(full);
+      else new Notice(t("cannotLocateFile"), 5000);
+    } catch {
+      new Notice(t("cannotOpenLocation"), 5000);
+    }
+  }
+}
+
+/** 该条目是否有可"打开源文件位置"的目标 */
+export function canRevealOrigin(it: GalleryItem): boolean {
+  return !!(it.path || it.originPath);
 }

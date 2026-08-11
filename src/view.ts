@@ -1,11 +1,11 @@
-import { ItemView, WorkspaceLeaf, Menu, Notice, setIcon, TFile } from "obsidian";
+import { ItemView, WorkspaceLeaf, Menu, Notice, setIcon } from "obsidian";
 import { GalleryStore } from "./store";
 import { Importer } from "./importer";
 import { GalleryItem, ItemType, SortMode, GalleryHubSettings } from "./types";
 import { CanvasBoard } from "./canvas";
 import { ThumbCache } from "./thumbs";
 import { t } from "./i18n";
-import { openResource, targetIcon } from "./resource";
+import { openResource, targetIcon, openItem, canOpen, revealOrigin } from "./resource";
 import {
   DetailModal,
   AddLinkModal,
@@ -1463,6 +1463,12 @@ export class GalleryView extends ItemView {
       const label = many ? t("nItems", { n: targets.length }) : "";
       const menu = new Menu();
       if (!many) {
+        // 打开:等效详情面板的打开按钮(link 智能分发 / 库内文件用 Obsidian 打开)
+        if (canOpen(it)) {
+          menu.addItem((mi) =>
+            mi.setTitle(t("open")).setIcon("external-link").onClick(() => openItem(this.app, it))
+          );
+        }
         menu.addItem((mi) =>
           mi.setTitle(t("editDetail")).setIcon("pencil").onClick(() => this.openDetail(it))
         );
@@ -1489,7 +1495,7 @@ export class GalleryView extends ItemView {
       if (!many && (it.path || it.originPath)) {
         menu.addItem((mi) =>
           mi.setTitle(t("openOrigin")).setIcon("folder-open").onClick(() => {
-            this.revealOrigin(it);
+            revealOrigin(this.app, it);
           })
         );
       }
@@ -1508,39 +1514,6 @@ export class GalleryView extends ItemView {
     });
 
     return card;
-  }
-
-  /** 打开源文件位置:自定义 originPath 优先(URL 开浏览器/路径开资源管理器),否则揭示库内文件 */
-  private revealOrigin(it: GalleryItem): void {
-    const origin = it.originPath?.trim();
-    if (origin) {
-      if (/^https?:\/\//i.test(origin)) {
-        window.open(origin);
-        return;
-      }
-      // 系统绝对路径:在资源管理器中显示
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { shell } = require("electron");
-        void shell.showItemInFolder(origin);
-      } catch {
-        new Notice(t("cannotOpenPath"));
-      }
-      return;
-    }
-    if (it.path) {
-      // 库内文件:换算绝对路径后在资源管理器中显示
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { shell } = require("electron");
-        const adapter = this.app.vault.adapter as { getFullPath?: (p: string) => string };
-        const full = adapter.getFullPath?.(it.path);
-        if (full) void shell.showItemInFolder(full);
-        else new Notice(t("cannotLocateFile"));
-      } catch {
-        new Notice(t("cannotOpenLocation"));
-      }
-    }
   }
 
   private openDetail(it: GalleryItem): void {
