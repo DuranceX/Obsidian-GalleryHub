@@ -211,6 +211,13 @@ export class DetailModal extends Modal {
 
     // ================= 右:信息栏 =================
     const bar = contentEl.createDiv({ cls: "ghub-panelbar" });
+    // 信息栏滚动后给关闭按钮加底衬(否则它悬在内容上像一个裸文字);
+    // 回到顶部则恢复无背景。CSS 负责过渡动画。
+    const syncScrolled = () => {
+      this.modalEl.toggleClass("is-scrolled", bar.scrollTop > 4);
+    };
+    bar.addEventListener("scroll", syncScrolled);
+    syncScrolled();
 
     // ---- 头部:类型徽标 + 操作图标 ----
     const head = bar.createDiv({ cls: "ghub-d-head" });

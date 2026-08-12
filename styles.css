@@ -676,6 +676,8 @@
   height: min(88vh, 900px);
   max-width: none;
   max-height: none;
+  /* 作为关闭按钮的定位上下文,使其固定在弹窗角落而非随内容滚动 */
+  position: relative;
   padding: 0 !important;
   background: var(--ghub-stage) !important;
   border: 1px solid var(--ghub-border);
@@ -683,14 +685,52 @@
   color: var(--ghub-text);
 }
 
+/* 隐藏 Obsidian 原生标题栏(本插件不用它,留着只占高度) */
+.modal.ghub-detail-modal .modal-header,
+.modal.ghub-detail-modal .modal-title {
+  display: none !important;
+}
+
+/* 关闭按钮固定在弹窗右上角:定位到 .modal 本身,
+   滚动只发生在内部 .ghub-panelbar,故不随信息栏滚动。
+   底衬默认透明,信息栏滚动后(.is-scrolled)才浮现,避免裸文字浮在内容上 */
 .modal.ghub-detail-modal .modal-close-button {
   color: var(--ghub-muted) !important;
   z-index: 30;
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  --icon-size: 15px;
+  cursor: pointer;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  transition:
+    background 0.18s var(--ghub-ease),
+    border-color 0.18s var(--ghub-ease),
+    color 0.18s var(--ghub-ease);
+}
+
+.modal.ghub-detail-modal.is-scrolled .modal-close-button {
+  background: var(--ghub-panel) !important;
+  border-color: var(--ghub-border) !important;
+  color: var(--ghub-text) !important;
 }
 
 .modal.ghub-detail-modal .modal-close-button:hover {
-  color: var(--ghub-text) !important;
   background: var(--ghub-panel) !important;
+  border-color: var(--ghub-border) !important;
+  color: var(--ghub-text) !important;
+}
+
+/* 已有底衬时,hover 再加深一档并提亮描边,保证悬停仍有可见反馈 */
+.modal.ghub-detail-modal.is-scrolled .modal-close-button:hover {
+  background: var(--ghub-panel-2) !important;
+  border-color: var(--ghub-border-hover) !important;
 }
 
 .modal.ghub-detail-modal .modal-content {
@@ -848,9 +888,14 @@
   place-items: center;
   border-radius: 7px;
   --icon-size: 15px;
+  cursor: pointer;
   background: transparent !important;
   border: 1px solid transparent !important;
   color: var(--ghub-muted) !important;
+  transition:
+    background 0.18s var(--ghub-ease),
+    border-color 0.18s var(--ghub-ease),
+    color 0.18s var(--ghub-ease);
 }
 
 .modal.ghub-detail-modal button.ghub-icon-btn:hover {
