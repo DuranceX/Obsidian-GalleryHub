@@ -143,6 +143,7 @@ const en = {
 
   // 右键菜单
   open: "Open",
+  docTruncated: "Content too long — truncated.",
   editDetail: "Edit details",
   batchEditN: "Batch edit {label}…",
   sendToBoardN: "Send to board{label}",
@@ -412,6 +413,7 @@ const zh: Record<keyof typeof en, string> = {
   nItems: "{n} 项",
 
   open: "打开",
+  docTruncated: "内容过长,已截断。",
   editDetail: "编辑详情",
   batchEditN: "批量编辑 {label}…",
   sendToBoardN: "发送到画布{label}",

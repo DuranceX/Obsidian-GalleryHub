@@ -127,3 +127,23 @@ export function revealOrigin(app: App, it: GalleryItem): void {
 export function canRevealOrigin(it: GalleryItem): boolean {
   return !!(it.path || it.originPath);
 }
+
+/** 可在详情舞台预览的纯文本类扩展名 → 渲染方式 */
+const PREVIEW_EXTS: Record<string, "markdown" | "text"> = {
+  md: "markdown",
+  markdown: "markdown",
+  txt: "text",
+  json: "text",
+  yaml: "text",
+  yml: "text",
+};
+
+/**
+ * 该 link 目标是否可在舞台做只读预览:仅限仓库内的文本类文件
+ * (系统路径不走 vault API,不预览)。返回渲染方式,不可预览则 null。
+ */
+export function previewKind(target: string): "markdown" | "text" | null {
+  if (classifyTarget(target) !== "vault") return null;
+  const ext = target.split(".").pop()?.toLowerCase() ?? "";
+  return PREVIEW_EXTS[ext] ?? null;
+}

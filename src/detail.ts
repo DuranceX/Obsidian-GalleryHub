@@ -1,14 +1,26 @@
-import { App, Modal, Notice, TFile, FuzzySuggestModal, setIcon } from "obsidian";
+import {
+  App,
+  Component,
+  Modal,
+  Notice,
+  TFile,
+  FuzzySuggestModal,
+  MarkdownRenderer,
+  setIcon,
+} from "obsidian";
 import { t } from "./i18n";
 import { GalleryStore } from "./store";
 import { GalleryItem } from "./types";
-import { openResource, targetIcon, classifyTarget } from "./resource";
+import { openResource, targetIcon, classifyTarget, previewKind } from "./resource";
 
 /** AI 参数分区折叠状态:模块级,跨卡片、跨弹窗同步(会话内记忆) */
 let genSectionCollapsed = false;
 
 /** 暗房 Lightbox:左侧大图舞台 + 右侧信息栏;可在序列中左右切换 */
 export class DetailModal extends Modal {
+  /** 管理 Markdown 预览渲染出的子组件生命周期(切换条目/关闭时卸载) */
+  private previewHost: Component | null = null;
+
   constructor(
     app: App,
     private store: GalleryStore,
@@ -61,8 +73,65 @@ export class DetailModal extends Modal {
     this.renderCurrent();
   }
 
+  /** 卸载上一次预览渲染出的子组件(切换条目/关闭时调用) */
+  private teardownPreview(): void {
+    this.previewHost?.unload();
+    this.previewHost = null;
+  }
+
+  /**
+   * 舞台只读预览仓库内文本文件。md 走 Obsidian 渲染器(排版/双链/代码块一致),
+   * txt/json/yaml 用等宽纯文本。可滚动;超长则截断并提示去 Obsidian 看全文。
+   */
+  private renderTextPreview(
+    stage: HTMLElement,
+    vaultPath: string,
+    kind: "markdown" | "text"
+  ): void {
+    const MAX_CHARS = 100_000; // 阈值只防病态大文件,正常笔记不会触及
+    const box = stage.createDiv({ cls: "ghub-stage-doc" });
+    const body = box.createDiv({
+      cls: kind === "markdown" ? "ghub-doc-md markdown-rendered" : "ghub-doc-text",
+    });
+
+    const f = this.app.vault.getAbstractFileByPath(vaultPath);
+    if (!(f instanceof TFile)) {
+      body.createDiv({ cls: "ghub-doc-empty", text: t("fileNotFound", { path: vaultPath }) });
+      return;
+    }
+
+    void this.app.vault.cachedRead(f).then((raw) => {
+      if (!body.isConnected) return;
+      const truncated = raw.length > MAX_CHARS;
+      const content = truncated ? raw.slice(0, MAX_CHARS) : raw;
+      if (kind === "markdown") {
+        this.previewHost = new Component();
+        this.previewHost.load();
+        void MarkdownRenderer.render(
+          this.app,
+          content,
+          body,
+          vaultPath,
+          this.previewHost
+        );
+      } else {
+        body.createEl("pre").createEl("code", { text: content });
+      }
+      if (truncated) {
+        const more = box.createDiv({ cls: "ghub-doc-more" });
+        more.createSpan({ text: t("docTruncated") });
+        const btn = more.createEl("button", { text: t("openInObsidian") });
+        btn.addEventListener("click", () => {
+          void openResource(this.app, vaultPath);
+          this.close();
+        });
+      }
+    });
+  }
+
   private renderCurrent(): void {
     const { contentEl } = this;
+    this.teardownPreview();
     contentEl.empty();
     const it = this.item;
 
@@ -189,6 +258,9 @@ export class DetailModal extends Modal {
           autoplay: "true",
         },
       });
+    } else if (it.type === "link" && it.url && previewKind(it.url)) {
+      // 仓库内文本类文件(md/txt/json/yaml):舞台做只读预览
+      this.renderTextPreview(stage, it.url, previewKind(it.url)!);
     } else if (it.type === "link" && it.url) {
       const box = stage.createDiv({ cls: "ghub-stage-link" });
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
@@ -258,7 +330,13 @@ export class DetailModal extends Modal {
     }
     if (it.type === "link" && it.url) {
       const kind = classifyTarget(it.url);
-      const label = kind === "url" ? t("openInBrowser") : t("openTarget");
+      // vault 内文件由 Obsidian 打开;系统文件交给默认程序;网址开浏览器
+      const label =
+        kind === "url"
+          ? t("openInBrowser")
+          : kind === "vault"
+            ? t("openInObsidian")
+            : t("openTarget");
       const icon = kind === "url" ? "external-link" : targetIcon(it.url);
       this.iconBtn(headActions, icon, label, () =>
         void openResource(this.app, it.url!)
@@ -525,6 +603,7 @@ export class DetailModal extends Modal {
   }
 
   onClose(): void {
+    this.teardownPreview();
     this.contentEl.empty();
   }
 }

@@ -594,8 +594,8 @@
 
 /* 详情舞台:笔记编辑区 */
 .ghub-stage-note {
-  width: min(78%, 640px);
-  height: min(80%, 560px);
+  width: min(88%, 820px);
+  height: min(90%, 700px);
   display: flex;
 }
 
@@ -609,6 +609,74 @@
   font-size: 14px;
   line-height: 1.7;
   padding: 18px 20px;
+}
+
+/* ---- 舞台:文本文件只读预览(md / txt / json / yaml)---- */
+.ghub-stage-doc {
+  width: min(88%, 820px);
+  height: min(90%, 700px);
+  display: flex;
+  flex-direction: column;
+  background: var(--ghub-panel);
+  border: 1px solid var(--ghub-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ghub-doc-md,
+.ghub-doc-text {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 22px;
+  color: var(--ghub-text);
+  font-size: 14px;
+  line-height: 1.7;
+  /* 预览为只读,但允许选中复制 */
+  user-select: text;
+}
+
+.ghub-doc-text pre {
+  margin: 0;
+  background: transparent;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ghub-doc-text code {
+  background: transparent;
+  color: var(--ghub-text);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+/* Obsidian 渲染出的元素在深色面板上的收敛处理 */
+.ghub-doc-md > :first-child {
+  margin-top: 0;
+}
+
+.ghub-doc-md img {
+  max-width: 100%;
+  height: auto;
+}
+
+.ghub-doc-empty {
+  padding: 18px 22px;
+  color: var(--ghub-muted);
+  font-size: 13px;
+}
+
+.ghub-doc-more {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px 8px 22px;
+  border-top: 1px solid var(--ghub-border);
+  background: var(--ghub-panel-2);
+  color: var(--ghub-muted);
+  font-size: 12px;
 }
 
 .ghub-stage-note textarea:focus {
