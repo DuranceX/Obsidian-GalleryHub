@@ -25,12 +25,22 @@ export class DetailModal extends Modal {
     this.modalEl.addClass("ghub-detail-modal", this.themeClass);
     this.renderCurrent();
 
-    // ←/→ 键切换
+    // ←/→ 键切换;正在输入(input/textarea/可编辑区)时交还给光标移动,不切换
+    const editing = (): boolean => {
+      const el = document.activeElement;
+      return (
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        (el instanceof HTMLElement && el.isContentEditable)
+      );
+    };
     this.scope.register([], "ArrowLeft", () => {
+      if (editing()) return true;
       this.step(-1);
       return false;
     });
     this.scope.register([], "ArrowRight", () => {
+      if (editing()) return true;
       this.step(1);
       return false;
     });

@@ -424,6 +424,8 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 6px;
+  /* 避开左上角多选圆钮(left:8px + 22px 宽):标签右移,不与其重合 */
+  padding-left: 26px;
 }
 
 .ghub-chip-p {

@@ -54,6 +54,9 @@ export class GalleryView extends ItemView {
   /** 网格卡片 DOM 索引(单条目原位更新用) */
   private gridCardEls = new Map<string, HTMLElement>();
   private sideTimer: number | null = null;
+  /** 卡片原位替换防抖:连续输入(标题/prompt/备注)时避免每键重建卡片 */
+  private cardTimer: number | null = null;
+  private pendingCards = new Set<string>();
   private filter: FilterState = {
     search: "",
     type: "all",
@@ -189,16 +192,32 @@ export class GalleryView extends ItemView {
     // 拖拽导入(系统文件)
     root.addEventListener("dragover", (e) => {
       e.preventDefault();
+      // 内部拖拽(卡片/文件夹)不显示"拖入导入"提示
+      const types = e.dataTransfer?.types;
+      if (
+        types?.includes("application/ghub-items") ||
+        types?.includes("application/ghub-folder")
+      )
+        return;
       root.addClass("ghub-dragging");
     });
     root.addEventListener("dragleave", () => root.removeClass("ghub-dragging"));
     root.addEventListener("drop", (e) => {
       e.preventDefault();
       root.removeClass("ghub-dragging");
-      if (e.dataTransfer?.files?.length) {
+      const dt = e.dataTransfer;
+      if (!dt) return;
+      // 内部拖拽(卡片/文件夹)落在画廊区域:不处理。
+      // 否则拖拽图片卡片时浏览器会把 <img> 填进 files,被误当系统文件重新导入
+      if (
+        dt.types.includes("application/ghub-items") ||
+        dt.types.includes("application/ghub-folder")
+      )
+        return;
+      if (dt.files?.length) {
         // 若正在浏览某文件夹,导入直接落到该文件夹
         void this.importer.importFiles(
-          e.dataTransfer.files,
+          dt.files,
           this.filter.folder ?? undefined
         );
       }
@@ -221,16 +240,25 @@ export class GalleryView extends ItemView {
       this.canvas?.refresh();
     });
 
-    // 单条目元数据变更:只原位替换该卡片(避免编辑时全画廊重建闪烁),
-    // 侧边栏(标签/评分计数)防抖刷新
+    // 单条目元数据变更:防抖后只原位替换该卡片(避免编辑时全画廊重建闪烁;
+    // 详情面板连续输入标题/prompt 时,每键触发一次变更,不防抖会让卡片不停重建),
+    // 侧边栏(标签/评分计数)同样防抖刷新
     this.unsubscribeItem = this.store.onItemChange((id) => {
-      const it = this.store.getItem(id);
-      const old = this.gridCardEls.get(id);
-      if (it && old && old.isConnected) {
-        const fresh = this.card(it);
-        old.replaceWith(fresh);
-        this.gridCardEls.set(id, fresh);
-      }
+      this.pendingCards.add(id);
+      if (this.cardTimer !== null) window.clearTimeout(this.cardTimer);
+      this.cardTimer = window.setTimeout(() => {
+        this.cardTimer = null;
+        for (const cid of this.pendingCards) {
+          const it = this.store.getItem(cid);
+          const old = this.gridCardEls.get(cid);
+          if (it && old && old.isConnected) {
+            const fresh = this.card(it);
+            old.replaceWith(fresh);
+            this.gridCardEls.set(cid, fresh);
+          }
+        }
+        this.pendingCards.clear();
+      }, 400);
       if (this.sideTimer !== null) window.clearTimeout(this.sideTimer);
       this.sideTimer = window.setTimeout(() => {
         this.sideTimer = null;
@@ -260,6 +288,7 @@ export class GalleryView extends ItemView {
     this.resizeObserver?.disconnect();
     if (this.resizeTimer !== null) window.clearTimeout(this.resizeTimer);
     if (this.sideTimer !== null) window.clearTimeout(this.sideTimer);
+    if (this.cardTimer !== null) window.clearTimeout(this.cardTimer);
     this.canvas?.destroy();
     // 释放进度监听(避免视图关闭后 Importer 持有失效 DOM)
     this.importer.onProgress = null;
