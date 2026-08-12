@@ -80,6 +80,63 @@ export class DetailModal extends Modal {
   }
 
   /**
+   * 笔记舞台:默认渲染态(markdown 排版),双击正文进编辑态(原生 textarea),
+   * 失焦回渲染态。不做光标级实时渲染 —— 那需要 contenteditable/CodeMirror,
+   * 会带来光标同步与中文输入法组合态等一系列问题,收益不抵成本。
+   */
+  private renderNoteStage(stage: HTMLElement): void {
+    const box = stage.createDiv({ cls: "ghub-stage-note" });
+
+    const toEdit = (): void => {
+      this.teardownPreview();
+      box.empty();
+      box.removeClass("is-preview");
+      const ta = box.createEl("textarea", {
+        attr: { placeholder: t("notePlaceholder"), spellcheck: "false" },
+      });
+      ta.value = this.item.note;
+      ta.addEventListener("input", () => this.patch({ note: ta.value }));
+      // 失焦回渲染态;有内容才渲染,空白留在编辑态便于继续写
+      ta.addEventListener("blur", () => {
+        if (ta.value.trim()) toPreview();
+      });
+      window.setTimeout(() => {
+        ta.focus();
+        // 光标置于末尾,便于续写
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+      }, 30);
+    };
+
+    const toPreview = (): void => {
+      this.teardownPreview();
+      box.empty();
+      box.addClass("is-preview");
+      const view = box.createDiv({
+        cls: "ghub-note-md markdown-rendered",
+        attr: { title: t("noteDblClickToEdit") },
+      });
+      this.previewHost = new Component();
+      this.previewHost.load();
+      void MarkdownRenderer.render(
+        this.app,
+        this.item.note,
+        view,
+        "",
+        this.previewHost
+      );
+      // 双击进编辑;点击渲染出的链接不应触发编辑
+      view.addEventListener("dblclick", (e) => {
+        if ((e.target as HTMLElement).closest("a")) return;
+        toEdit();
+      });
+    };
+
+    // 空白便签直接进编辑态,省一次双击
+    if (this.item.note.trim()) toPreview();
+    else toEdit();
+  }
+
+  /**
    * 舞台只读预览仓库内文本文件。md 走 Obsidian 渲染器(排版/双链/代码块一致),
    * txt/json/yaml 用等宽纯文本。可滚动;超长则截断并提示去 Obsidian 看全文。
    */
@@ -271,14 +328,7 @@ export class DetailModal extends Modal {
         void openResource(this.app, it.url!);
       });
     } else if (it.type === "note") {
-      // 笔记:舞台即编辑区,大文本框直改 note 字段
-      const box = stage.createDiv({ cls: "ghub-stage-note" });
-      const ta = box.createEl("textarea", {
-        attr: { placeholder: t("notePlaceholder"), spellcheck: "false" },
-      });
-      ta.value = it.note;
-      ta.addEventListener("input", () => this.patch({ note: ta.value }));
-      window.setTimeout(() => ta.focus(), 30);
+      this.renderNoteStage(stage);
     }
 
     // ================= 右:信息栏 =================

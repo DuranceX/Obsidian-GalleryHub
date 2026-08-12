@@ -611,6 +611,39 @@
   padding: 18px 20px;
 }
 
+/* 笔记渲染态:外观与编辑态 textarea 对齐,切换时不跳动 */
+.ghub-stage-note.is-preview {
+  background: var(--ghub-panel);
+  border: 1px solid var(--ghub-border);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: text;
+}
+
+.ghub-note-md {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 20px;
+  color: var(--ghub-text);
+  font-size: 14px;
+  line-height: 1.7;
+  user-select: text;
+}
+
+.ghub-note-md > :first-child {
+  margin-top: 0;
+}
+
+.ghub-note-md > :last-child {
+  margin-bottom: 0;
+}
+
+.ghub-note-md img {
+  max-width: 100%;
+  height: auto;
+}
+
 /* ---- 舞台:文本文件只读预览(md / txt / json / yaml)---- */
 .ghub-stage-doc {
   width: min(88%, 820px);
