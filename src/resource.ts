@@ -1,9 +1,30 @@
-import { App, Notice, TFile } from "obsidian";
+import { App, FileSystemAdapter, Notice, Platform, TFile } from "obsidian";
 import { t } from "./i18n";
 import { GalleryItem } from "./types";
 
 /** 链接目标的三种来源 */
 export type TargetKind = "url" | "vault" | "system";
+
+type ElectronShell = typeof import("electron").shell;
+
+/** Electron 仅在桌面端按需加载，避免移动端启动时解析桌面模块。 */
+async function loadElectronShell(): Promise<ElectronShell | null> {
+  if (!Platform.isDesktopApp) return null;
+  try {
+    return (await import("electron")).shell;
+  } catch {
+    return null;
+  }
+}
+
+async function revealSystemPath(path: string, errorMessage: string): Promise<void> {
+  const shell = await loadElectronShell();
+  if (!shell) {
+    new Notice(errorMessage, 5000);
+    return;
+  }
+  shell.showItemInFolder(path);
+}
 
 /**
  * 判定一个链接目标属于哪种来源:
@@ -59,8 +80,11 @@ export async function openResource(app: App, target: string): Promise<void> {
 
   // system:用系统默认程序打开,失败(路径不存在等)则提示
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { shell } = require("electron");
+    const shell = await loadElectronShell();
+    if (!shell) {
+      new Notice(t("fileNotFound", { path: s }), 5000);
+      return;
+    }
     const err: string = await shell.openPath(s);
     if (err) new Notice(t("fileNotFound", { path: s }), 5000);
   } catch {
@@ -100,26 +124,17 @@ export function revealOrigin(app: App, it: GalleryItem): void {
       window.open(origin);
       return;
     }
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { shell } = require("electron");
-      void shell.showItemInFolder(origin);
-    } catch {
-      new Notice(t("cannotOpenPath"), 5000);
-    }
+    void revealSystemPath(origin, t("cannotOpenPath"));
     return;
   }
   if (it.path) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { shell } = require("electron");
-      const adapter = app.vault.adapter as { getFullPath?: (p: string) => string };
-      const full = adapter.getFullPath?.(it.path);
-      if (full) void shell.showItemInFolder(full);
-      else new Notice(t("cannotLocateFile"), 5000);
-    } catch {
-      new Notice(t("cannotOpenLocation"), 5000);
+    const adapter = app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) {
+      new Notice(t("cannotLocateFile"), 5000);
+      return;
     }
+    const full = adapter.getFullPath(it.path);
+    void revealSystemPath(full, t("cannotOpenLocation"));
   }
 }
 

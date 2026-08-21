@@ -408,7 +408,12 @@ export class CanvasBoard {
 
   private isEditableTarget(e: Event): boolean {
     const t = e.target as HTMLElement | null;
-    return !!t && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable);
+    return (
+      !!t &&
+      (t.instanceOf(HTMLInputElement) ||
+        t.instanceOf(HTMLTextAreaElement) ||
+        t.isContentEditable)
+    );
   }
 
   // ================= 框选 =================
@@ -454,7 +459,7 @@ export class CanvasBoard {
     this.selectedIds = keep;
     this.selectedElIds = keepEl;
     for (const it of this.store.itemsOnBoard(this.boardId)) {
-      const p = it.layouts[this.boardId]!;
+      const p = it.layouts[this.boardId];
       const cw = p.w || DEFAULT_CARD_W;
       // 实际渲染高度优先(音频/链接等 h=null 的旧数据按比例估会偏大,导致下方误选)
       const dom = this.cardEls.get(it.id);
@@ -958,8 +963,8 @@ export class CanvasBoard {
         }
       } else {
         dragOrigin.set(it.id, {
-          x: it.layouts[this.boardId]!.x,
-          y: it.layouts[this.boardId]!.y,
+          x: it.layouts[this.boardId].x,
+          y: it.layouts[this.boardId].y,
         });
       }
       node.addClass("is-dragging");
@@ -967,7 +972,6 @@ export class CanvasBoard {
       // 不在此处 bringToFront:拖动中 appendChild 会移动 DOM 节点,
       // 浏览器随即丢弃 pointer capture,导致鼠标移出卡片后拖动中断。
       // 先用 z-index 视觉置顶,松手后再真正调整 DOM/z 序。
-      node.style.zIndex = "9999";
       e.stopPropagation();
     });
     node.addEventListener("pointermove", (e) => {
@@ -1011,7 +1015,6 @@ export class CanvasBoard {
         moveRaf = null;
       }
       node.removeClass("is-dragging");
-      node.style.zIndex = "";
       try {
         node.releasePointerCapture(e.pointerId);
       } catch {
@@ -1049,7 +1052,7 @@ export class CanvasBoard {
       resizing = true;
       sx = e.clientX;
       rsy = e.clientY;
-      const cur = it.layouts[this.boardId]!;
+      const cur = it.layouts[this.boardId];
       rw = cur.w || DEFAULT_CARD_W;
       rh = cur.h ?? node.offsetHeight;
       node.setPointerCapture(e.pointerId);
@@ -1058,7 +1061,7 @@ export class CanvasBoard {
     });
     node.addEventListener("pointermove", (e) => {
       if (!resizing) return;
-      const cur = it.layouts[this.boardId]!;
+      const cur = it.layouts[this.boardId];
       cur.w = Math.max(60, rw + (e.clientX - sx) / this.scale);
       if (freeform) {
         // 音频/链接:宽高独立
@@ -1079,7 +1082,7 @@ export class CanvasBoard {
       } catch {
         /* ignore */
       }
-      const cur = it.layouts[this.boardId]!;
+      const cur = it.layouts[this.boardId];
       this.store.setLayout(it.id, this.boardId, { ...cur }, true);
     };
     node.addEventListener("pointerup", endResize);
@@ -1120,7 +1123,7 @@ export class CanvasBoard {
               .itemsOnBoard(this.boardId)
               .map((x) => x.layouts[this.boardId]?.z ?? 0)
           );
-          const cur = it.layouts[this.boardId]!;
+          const cur = it.layouts[this.boardId];
           cur.z = min - 1;
           this.store.setLayout(it.id, this.boardId, { ...cur }, true);
           this.worldEl.insertBefore(node, this.worldEl.firstChild);
@@ -1158,7 +1161,7 @@ export class CanvasBoard {
         .itemsOnBoard(this.boardId)
         .map((x) => x.layouts[this.boardId]?.z ?? 0)
     );
-    const cur = it.layouts[this.boardId]!;
+    const cur = it.layouts[this.boardId];
     if (cur.z <= max && this.worldEl.lastChild !== node) {
       cur.z = max + 1;
       this.store.setLayout(it.id, this.boardId, { ...cur }, true);
@@ -1192,7 +1195,7 @@ export class CanvasBoard {
     let maxX = -Infinity;
     let maxY = -Infinity;
     for (const it of items) {
-      const p = it.layouts[this.boardId]!;
+      const p = it.layouts[this.boardId];
       const ratio = it.w && it.h ? it.h / it.w : 0.75;
       const w = p.w || DEFAULT_CARD_W;
       const h = p.h ?? w * ratio;
@@ -1209,8 +1212,8 @@ export class CanvasBoard {
     this.tx = (rect.width - (maxX - minX) * this.scale) / 2 - minX * this.scale;
     this.ty = (rect.height - (maxY - minY) * this.scale) / 2 - minY * this.scale;
     if (animated) {
-      this.worldEl.style.transition = "transform 0.25s ease";
-      window.setTimeout(() => (this.worldEl.style.transition = ""), 260);
+      this.worldEl.addClass("is-fitting");
+      window.setTimeout(() => this.worldEl.removeClass("is-fitting"), 260);
     }
     this.applyTransform();
   }

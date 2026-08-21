@@ -14,6 +14,7 @@ import {
   ConfirmDeleteModal,
   ConfirmTrashModal,
   BatchEditModal,
+  RenameBoardModal,
 } from "./detail";
 
 export const VIEW_TYPE_GALLERY = "gallery-hub-view";
@@ -144,11 +145,12 @@ export class GalleryView extends ItemView {
       (entries) => {
         for (const en of entries) {
           if (en.isIntersecting) {
-            const el = en.target as HTMLElement;
+            const el = en.target;
+            if (!el.instanceOf(HTMLElement)) continue;
             const src = el.dataset.src;
             if (src) {
-              if (el instanceof HTMLImageElement) el.src = src;
-              if (el instanceof HTMLVideoElement) {
+              if (el.instanceOf(HTMLImageElement)) el.src = src;
+              if (el.instanceOf(HTMLVideoElement)) {
                 el.src = src;
                 el.preload = "metadata";
               }
@@ -180,11 +182,13 @@ export class GalleryView extends ItemView {
       this.progressTextEl.setText(
         t("importProgress", { current, total, name })
       );
-      this.progressBarEl.style.width = `${Math.round((current / total) * 100)}%`;
+      this.progressBarEl.setCssProps({
+        "--ghub-import-progress": `${Math.round((current / total) * 100)}%`,
+      });
     };
     this.importer.onProgressDone = () => {
       this.progressEl.removeClass("is-visible");
-      this.progressBarEl.style.width = "0";
+      this.progressBarEl.setCssProps({ "--ghub-import-progress": "0%" });
     };
     this.gridEl = main.createDiv({ cls: "ghub-grid" });
     this.canvasHostEl = main.createDiv({ cls: "ghub-canvas-host" });
@@ -353,7 +357,7 @@ export class GalleryView extends ItemView {
           })
         );
       }
-      menu.showAtMouseEvent(e as MouseEvent);
+      menu.showAtMouseEvent(e);
     });
 
     const search = bar.createEl("input", {
@@ -387,7 +391,7 @@ export class GalleryView extends ItemView {
             })
         );
       }
-      menu.showAtMouseEvent(e as MouseEvent);
+      menu.showAtMouseEvent(e);
     });
     this.refreshSortButton();
 
@@ -405,7 +409,7 @@ export class GalleryView extends ItemView {
       menu.addItem((mi) =>
         mi.setTitle(t("importVaultFile")).setIcon("file-symlink").onClick(() => this.pickVaultFile())
       );
-      menu.showAtMouseEvent(e as MouseEvent);
+      menu.showAtMouseEvent(e);
     });
 
     const linkBtn = bar.createEl("button", {
@@ -466,11 +470,13 @@ export class GalleryView extends ItemView {
     this.updateToolbarMode();
     if (mode === "canvas") {
       // 默认进入第一个画布
-      if (!this.activeBoardId) {
+      let boardId = this.activeBoardId;
+      if (!boardId) {
         const ids = Object.keys(this.store.getBoards());
-        this.activeBoardId = ids[0] ?? this.store.createBoard(t("defaultBoard"));
+        boardId = ids[0] ?? this.store.createBoard(t("defaultBoard"));
+        this.activeBoardId = boardId;
       }
-      this.openBoard(this.activeBoardId!);
+      this.openBoard(boardId);
     } else {
       this.canvas?.destroy();
       this.canvas = null;
@@ -527,22 +533,30 @@ export class GalleryView extends ItemView {
   private renameActiveBoard(): void {
     if (!this.activeBoardId) return;
     const cur = this.store.getBoards()[this.activeBoardId];
-    const name = window.prompt(t("boardNamePrompt"), cur?.name ?? "");
-    if (name?.trim()) this.store.renameBoard(this.activeBoardId, name);
-    this.refreshBoardSelect();
+    const boardId = this.activeBoardId;
+    new RenameBoardModal(
+      this.app,
+      this.getTheme(),
+      cur?.name ?? "",
+      (name) => {
+        this.store.renameBoard(boardId, name);
+        this.refreshBoardSelect();
+        this.renderSidebar();
+      }
+    ).open();
   }
 
   private deleteActiveBoard(): void {
     if (!this.activeBoardId) return;
+    const boardId = this.activeBoardId;
     const boards = this.store.getBoards();
-    const cur = boards[this.activeBoardId];
+    const cur = boards[boardId];
     new ConfirmDeleteModal(
       this.app,
       this.getTheme(),
-      this.store.itemsOnBoard(this.activeBoardId).length,
+      this.store.itemsOnBoard(boardId).length,
       () => {
-        const doomed = this.activeBoardId!;
-        this.store.deleteBoard(doomed);
+        this.store.deleteBoard(boardId);
         const next = Object.keys(this.store.getBoards())[0];
         this.openBoard(next);
       },
@@ -656,7 +670,7 @@ export class GalleryView extends ItemView {
     // 发送到画布
     const toBoard = bar.createEl("button", { text: t("sendToBoard") });
     toBoard.addEventListener("click", (e) => {
-      this.sendToBoard(this.selectedItems(), e as MouseEvent);
+      this.sendToBoard(this.selectedItems(), e);
     });
 
     const del = bar.createEl("button", { text: t("deleteBtn"), cls: "ghub-danger" });
@@ -812,7 +826,7 @@ export class GalleryView extends ItemView {
         (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh")
       );
       for (const [tag, n] of sorted) {
-        const chip = cloud.createEl("span", {
+        const chip = cloud.createSpan({
           cls: "ghub-tag" + (this.filter.tags.has(tag) ? " is-active" : ""),
         });
         chip.createSpan({ text: `${tag} ${n}` });
@@ -844,7 +858,7 @@ export class GalleryView extends ItemView {
         });
       }
       if (this.filter.tags.size) {
-        const clear = cloud.createEl("span", {
+        const clear = cloud.createSpan({
           text: t("clearTags"),
           cls: "ghub-tag",
         });
@@ -1155,13 +1169,14 @@ export class GalleryView extends ItemView {
           .split(",")
           .map((id) => this.store.getItem(id))
           .filter((it): it is GalleryItem => !!it);
-        if (items.length)
-          void this.importer.moveItems(items, rel).then(() => {
+        if (items.length) {
+          void (async () => {
+            await this.importer.moveItems(items, rel);
             this.clearSelection();
-            this.refreshFolders();
-            this.renderSidebar();
+            await this.refreshFolders();
             this.renderGrid(); // 移走的卡片需立即从当前网格消失
-          });
+          })();
+        }
         return;
       }
 

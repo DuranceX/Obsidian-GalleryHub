@@ -95,12 +95,12 @@ export default class GalleryHubPlugin extends Plugin {
     );
   }
 
-  async onunload(): Promise<void> {
+  onunload(): void {
     // 清除注入到 body 的强调色变量,避免禁用后残留
     document.body.style.removeProperty("--ghub-accent-user");
     document.body.style.removeProperty("--ghub-accent-hover-user");
     document.body.style.removeProperty("--ghub-on-accent-user");
-    await this.store.flush();
+    void this.store.flush();
   }
 
   // ---------- 语言 ----------
@@ -168,7 +168,8 @@ export default class GalleryHubPlugin extends Plugin {
   // ---------- 设置 ----------
 
   async loadSettings(): Promise<void> {
-    this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) ?? {}) };
+    const data: unknown = await this.loadData();
+    this.settings = parseSettings(data);
   }
 
   async saveSettings(): Promise<void> {
@@ -192,6 +193,60 @@ export default class GalleryHubPlugin extends Plugin {
 }
 
 // ---------- 颜色工具 ----------
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** 只接受已知设置字段，旧版或损坏数据按字段回退默认值。 */
+function parseSettings(value: unknown): GalleryHubSettings {
+  if (!isRecord(value)) return { ...DEFAULT_SETTINGS };
+
+  const colorMode = value.colorMode;
+  const language = value.language;
+  return {
+    colorMode:
+      colorMode === "dark" || colorMode === "light" || colorMode === "follow"
+        ? colorMode
+        : DEFAULT_SETTINGS.colorMode,
+    accentColor:
+      typeof value.accentColor === "string"
+        ? value.accentColor
+        : DEFAULT_SETTINGS.accentColor,
+    language:
+      language === "auto" || language === "zh" || language === "en"
+        ? language
+        : DEFAULT_SETTINGS.language,
+    dataFolder:
+      typeof value.dataFolder === "string"
+        ? value.dataFolder
+        : DEFAULT_SETTINGS.dataFolder,
+    showFolders:
+      typeof value.showFolders === "boolean"
+        ? value.showFolders
+        : DEFAULT_SETTINGS.showFolders,
+    showBoards:
+      typeof value.showBoards === "boolean"
+        ? value.showBoards
+        : DEFAULT_SETTINGS.showBoards,
+    showTypes:
+      typeof value.showTypes === "boolean"
+        ? value.showTypes
+        : DEFAULT_SETTINGS.showTypes,
+    showRatings:
+      typeof value.showRatings === "boolean"
+        ? value.showRatings
+        : DEFAULT_SETTINGS.showRatings,
+    showTags:
+      typeof value.showTags === "boolean"
+        ? value.showTags
+        : DEFAULT_SETTINGS.showTags,
+    skipDeleteConfirm:
+      typeof value.skipDeleteConfirm === "boolean"
+        ? value.skipDeleteConfirm
+        : DEFAULT_SETTINGS.skipDeleteConfirm,
+  };
+}
 
 /** 规范化为 #rrggbb;非法/空返回 "" */
 function normalizeHex(input: string): string {

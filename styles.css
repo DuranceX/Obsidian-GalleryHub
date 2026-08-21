@@ -1820,6 +1820,11 @@
 .ghub-cnode.is-dragging {
   cursor: grabbing;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+}
+
+.ghub-world.is-fitting {
+  transition: transform 0.25s ease;
 }
 
 .ghub-cnode img,
@@ -2228,7 +2233,7 @@
 
 .ghub-import-progress-bar {
   height: 100%;
-  width: 0;
+  width: var(--ghub-import-progress, 0%);
   border-radius: 3px;
   background: var(--ghub-accent);
   transition: width 0.15s ease;

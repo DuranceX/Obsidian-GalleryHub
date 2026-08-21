@@ -1,4 +1,4 @@
-import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
+import { App, Notice, TFile, TFolder, normalizePath } from "obsidian";
 import { GalleryStore, ASSETS_DIR } from "./store";
 import {
   GalleryItem,
@@ -337,7 +337,7 @@ export class Importer {
       return null;
     }
     try {
-      await this.app.fileManager.renameFile(f as TAbstractFile, newPath);
+      await this.app.fileManager.renameFile(f, newPath);
     } catch (e) {
       new Notice(t("operationFailed", { msg: (e as Error).message }));
       return null;
@@ -387,7 +387,7 @@ export class Importer {
       )
       .map((it) => it.id);
     try {
-      await this.app.vault.trash(f, true);
+      await this.app.fileManager.trashFile(f);
     } catch (e) {
       new Notice(t("deleteFailed", { msg: (e as Error).message }));
       return null;
@@ -464,7 +464,7 @@ export class Importer {
         const f = this.app.vault.getAbstractFileByPath(it.path);
         if (f instanceof TFile) {
           try {
-            await this.app.vault.trash(f, true); // 系统回收站,可恢复
+            await this.app.fileManager.trashFile(f);
           } catch (e) {
             new Notice(t("deleteFileFailed", { path: it.path, msg: (e as Error).message }), 6000);
           }

@@ -40,10 +40,10 @@ export class DetailModal extends Modal {
     // ←/→ 键切换;正在输入(input/textarea/可编辑区)时交还给光标移动,不切换
     const editing = (): boolean => {
       const el = document.activeElement;
-      return (
-        el instanceof HTMLInputElement ||
-        el instanceof HTMLTextAreaElement ||
-        (el instanceof HTMLElement && el.isContentEditable)
+      return !!(
+        el?.instanceOf(HTMLInputElement) ||
+        el?.instanceOf(HTMLTextAreaElement) ||
+        (el?.instanceOf(HTMLElement) && el.isContentEditable)
       );
     };
     this.scope.register([], "ArrowLeft", () => {
@@ -947,6 +947,61 @@ export class ConfirmTrashModal extends Modal {
     });
     const cancel = actions.createEl("button", { text: t("cancel") });
     cancel.addEventListener("click", () => this.close());
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
+/** 画布重命弹窗，替代阻塞页面且无法套用主题的原生 prompt。 */
+export class RenameBoardModal extends Modal {
+  constructor(
+    app: App,
+    private themeClass: string,
+    private currentName: string,
+    private onSubmit: (name: string) => void
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.modalEl.addClass("ghub-detail-modal", this.themeClass);
+    const bar = this.contentEl.createDiv({ cls: "ghub-panelbar" });
+    bar.createEl("h2", { text: t("renameBoard") });
+
+    const field = bar.createDiv({ cls: "ghub-field" });
+    field.createDiv({ cls: "ghub-field-label" }).createSpan({
+      text: t("boardNamePrompt"),
+    });
+    const input = field.createEl("input", {
+      attr: { type: "text" },
+      value: this.currentName,
+    });
+
+    const submit = (): void => {
+      const name = input.value.trim();
+      if (!name) return;
+      this.onSubmit(name);
+      this.close();
+    };
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") submit();
+    });
+
+    const actions = bar.createDiv({ cls: "ghub-actions" });
+    const rename = actions.createEl("button", {
+      text: t("rename"),
+      cls: "mod-cta",
+    });
+    rename.addEventListener("click", submit);
+    const cancel = actions.createEl("button", { text: t("cancel") });
+    cancel.addEventListener("click", () => this.close());
+
+    window.setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 30);
   }
 
   onClose(): void {

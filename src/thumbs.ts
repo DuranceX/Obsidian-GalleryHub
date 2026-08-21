@@ -122,7 +122,7 @@ export class ThumbCache {
         const scale = THUMB_MAX / Math.max(bmp.width, bmp.height);
         const w = Math.max(1, Math.round(bmp.width * scale));
         const h = Math.max(1, Math.round(bmp.height * scale));
-        const canvas = document.createElement("canvas");
+        const canvas = createEl("canvas");
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext("2d");

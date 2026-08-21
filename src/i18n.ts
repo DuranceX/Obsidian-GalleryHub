@@ -1,9 +1,11 @@
 /**
  * 轻量 i18n:t("key") 取当前语言文案。
  * - locale 由 setLocale 设置("zh" | "en")
- * - 设置项 language: "auto" 时读取 Obsidian 界面语言(localStorage.language)
+ * - 设置项 language: "auto" 时读取 Obsidian 界面语言
  * - 词典 key 缺失时回退英文,再回退 key 本身(保证永不崩)
  */
+
+import { getLanguage } from "obsidian";
 
 export type Locale = "zh" | "en";
 
@@ -19,8 +21,7 @@ export function getLocale(): Locale {
 
 /** 解析 Obsidian 界面语言(默认英文) */
 export function detectObsidianLocale(): Locale {
-  const lang = window.localStorage.getItem("language");
-  return lang?.startsWith("zh") ? "zh" : "en";
+  return getLanguage().startsWith("zh") ? "zh" : "en";
 }
 
 /** 文案插值:t("msg", {n: 3}) 替换 {n} */
