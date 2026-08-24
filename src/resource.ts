@@ -55,7 +55,7 @@ export function targetIcon(target: string): string {
  * 智能打开链接目标:
  * - url → 浏览器
  * - vault → Obsidian 原生打开(md 可编辑、canvas 跳 Canvas、pdf/图片走对应查看器)
- * - system → 交给操作系统默认程序
+ * - system → 在系统文件管理器中显示
  * 找不到文件时给出错误提示(换设备后系统路径失效等)。
  */
 export async function openResource(app: App, target: string): Promise<void> {
@@ -78,18 +78,8 @@ export async function openResource(app: App, target: string): Promise<void> {
     return;
   }
 
-  // system:用系统默认程序打开,失败(路径不存在等)则提示
-  try {
-    const shell = await loadElectronShell();
-    if (!shell) {
-      new Notice(t("fileNotFound", { path: s }), 5000);
-      return;
-    }
-    const err: string = await shell.openPath(s);
-    if (err) new Notice(t("fileNotFound", { path: s }), 5000);
-  } catch {
-    new Notice(t("fileNotFound", { path: s }), 5000);
-  }
+  // system:在 Windows Explorer / macOS Finder 中定位文件。
+  await revealSystemPath(s, t("fileNotFound", { path: s }));
 }
 
 /**
