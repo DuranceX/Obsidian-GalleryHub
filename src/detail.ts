@@ -11,6 +11,7 @@ import {
 import { t } from "./i18n";
 import { GalleryStore } from "./store";
 import { GalleryItem } from "./types";
+import { Importer } from "./importer";
 import { openResource, targetIcon, classifyTarget, previewKind } from "./resource";
 
 /** AI 参数分区折叠状态:模块级,跨卡片、跨弹窗同步(会话内记忆) */
@@ -24,6 +25,7 @@ export class DetailModal extends Modal {
   constructor(
     app: App,
     private store: GalleryStore,
+    private importer: Importer,
     private item: GalleryItem,
     private themeClass: string,
     private onDeleted?: () => void,
@@ -415,11 +417,58 @@ export class DetailModal extends Modal {
       this.patch({ title: titleInput.value })
     );
 
-    // ---- 文件信息 ----
-    const fmeta: string[] = [];
-    if (it.fileName) fmeta.push(it.fileName);
-    fmeta.push(new Date(it.createdAt).toLocaleDateString());
-    bar.createDiv({ cls: "ghub-fmeta", text: fmeta.join("  ·  ") });
+    // ---- 文件名(仅主文件名可编辑,扩展名固定) + 独立日期行 ----
+    const physicalFile = it.path
+      ? this.app.vault.getAbstractFileByPath(it.path)
+      : null;
+    if (physicalFile instanceof TFile) {
+      const row = bar.createDiv({ cls: "ghub-file-name-edit" });
+      const input = row.createEl("input", {
+        cls: "ghub-file-name-input",
+        attr: { type: "text", "aria-label": t("fileName") },
+      });
+      let committedName = physicalFile.basename;
+      let committing = false;
+      input.value = committedName;
+      if (physicalFile.extension) {
+        row.createSpan({
+          cls: "ghub-file-extension",
+          text: `.${physicalFile.extension}`,
+        });
+      }
+
+      const commit = async () => {
+        if (committing) return;
+        const requested = input.value.trim();
+        if (requested === committedName) {
+          input.value = committedName;
+          return;
+        }
+        committing = true;
+        input.disabled = true;
+        const renamed = await this.importer.renameItemFile(it.id, requested);
+        if (renamed) committedName = renamed;
+        input.value = committedName;
+        input.disabled = false;
+        committing = false;
+      };
+      input.addEventListener("blur", () => void commit());
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          void commit();
+        } else if (e.key === "Escape") {
+          input.value = committedName;
+          input.blur();
+        }
+      });
+    } else if (it.fileName) {
+      bar.createDiv({ cls: "ghub-fmeta", text: it.fileName });
+    }
+    bar.createDiv({
+      cls: "ghub-fmeta ghub-file-date",
+      text: new Date(it.createdAt).toLocaleDateString(),
+    });
 
     // ---- 星级点选(悬停预览填充)----
     // 星星只创建一次,悬停/点击仅切换 class。若在 mouseenter 里重建 DOM,
@@ -1014,7 +1063,7 @@ export class AddLinkModal extends Modal {
   constructor(
     app: App,
     private themeClass: string,
-    private onSubmit: (url: string, title: string) => void
+    private onSubmit: (url: string, title: string, coverUrl: string) => boolean
   ) {
     super(app);
   }
@@ -1033,6 +1082,7 @@ export class AddLinkModal extends Modal {
 
     let url = "";
     let title = "";
+    let coverUrl = "";
     const f1 = bar.createDiv({ cls: "ghub-field" });
     f1.createDiv({ cls: "ghub-field-label" }).createSpan({ text: t("urlLabel") });
     const urlInput = f1.createEl("input", {
@@ -1045,15 +1095,31 @@ export class AddLinkModal extends Modal {
       attr: { type: "text", placeholder: t("titleAutoDomain") },
     });
     titleInput.addEventListener("input", () => (title = titleInput.value.trim()));
+    const f3 = bar.createDiv({ cls: "ghub-field" });
+    f3.createDiv({ cls: "ghub-field-label" }).createSpan({
+      text: t("coverUrlOptional"),
+    });
+    const coverInput = f3.createEl("input", {
+      attr: {
+        type: "url",
+        placeholder: t("coverUrlPlaceholder"),
+      },
+    });
+    coverInput.addEventListener(
+      "input",
+      () => (coverUrl = coverInput.value.trim())
+    );
 
     const submit = () => {
-      this.onSubmit(url, title);
-      this.close();
+      if (this.onSubmit(url, title, coverUrl)) this.close();
     };
     urlInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") submit();
     });
     titleInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submit();
+    });
+    coverInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") submit();
     });
 

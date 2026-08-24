@@ -770,6 +770,75 @@
   white-space: nowrap;
 }
 
+/* 带封面的链接卡：保留明确的链接徽标和标题，避免被误认为普通图片。 */
+.ghub-thumb.ghub-link-cover {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-height: 120px;
+  background: var(--ghub-panel-2);
+}
+
+.ghub-thumb.ghub-link-cover > img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+}
+
+.ghub-link-cover-badge {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(10, 10, 12, 0.76);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  backdrop-filter: blur(5px);
+  pointer-events: none;
+}
+
+.ghub-link-cover-badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ghub-link-cover-meta {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 28px 12px 11px;
+  background: linear-gradient(transparent, rgba(8, 8, 10, 0.88));
+  color: #fff;
+  pointer-events: none;
+}
+
+.ghub-link-cover-title {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ghub-link-cover-domain {
+  overflow: hidden;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ================= 详情 Lightbox =================
    压过 .modal 的主题底色 */
 .modal.ghub-detail-modal {
@@ -1040,6 +1109,47 @@
   word-break: break-all;
 }
 
+.ghub-file-name-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: var(--ghub-faint);
+  font-size: 10.5px;
+}
+
+.ghub-panelbar .ghub-file-name-edit input[type="text"] {
+  min-width: 0;
+  flex: 1;
+}
+
+.ghub-panelbar .ghub-file-name-input {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0;
+  color: var(--ghub-faint) !important;
+  font-size: 10.5px;
+  padding: 2px 0 4px;
+  box-shadow: none !important;
+}
+
+.ghub-panelbar .ghub-file-name-input:hover,
+.ghub-panelbar .ghub-file-name-input:focus {
+  border-bottom-color: var(--ghub-border) !important;
+  outline: none;
+}
+
+.ghub-file-extension {
+  flex: none;
+  color: inherit;
+  font-size: inherit;
+}
+
+.ghub-file-date {
+  margin-top: -8px;
+}
+
 /* ---- 生成参数分区卡片 ---- */
 .ghub-sec {
   background: color-mix(in srgb, var(--ghub-panel) 55%, transparent);
@@ -1231,7 +1341,8 @@
   outline-offset: 1px;
 }
 
-.ghub-panelbar input[type="text"]:not(.ghub-title-input),
+.ghub-panelbar input[type="text"]:not(.ghub-title-input):not(.ghub-file-name-input),
+.ghub-panelbar input[type="url"],
 .ghub-panelbar textarea {
   width: 100%;
   background: var(--ghub-panel) !important;
@@ -1858,6 +1969,27 @@
   word-break: break-all;
   max-height: 3em;
   overflow: hidden;
+}
+
+.ghub-cnode-link-cover {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.ghub-cnode-link-cover > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ghub-cnode-link-cover.is-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
 }
 
 .ghub-cnode-title {

@@ -25,7 +25,11 @@ export default class GalleryHubPlugin extends Plugin {
     this.applyAccent();
     setDataRoot(this.settings.dataFolder);
     this.store = new GalleryStore(this.app);
-    this.importer = new Importer(this.app, this.store);
+    this.importer = new Importer(
+      this.app,
+      this.store,
+      () => this.settings.preserveOriginalFileName
+    );
     this.thumbs = new ThumbCache(this.app);
     this.importer.thumbs = this.thumbs;
 
@@ -245,6 +249,10 @@ function parseSettings(value: unknown): GalleryHubSettings {
       typeof value.skipDeleteConfirm === "boolean"
         ? value.skipDeleteConfirm
         : DEFAULT_SETTINGS.skipDeleteConfirm,
+    preserveOriginalFileName:
+      typeof value.preserveOriginalFileName === "boolean"
+        ? value.preserveOriginalFileName
+        : DEFAULT_SETTINGS.preserveOriginalFileName,
   };
 }
 
@@ -372,6 +380,18 @@ class GalleryHubSettingTab extends PluginSettingTab {
             setDataRoot(this.plugin.settings.dataFolder);
             await this.plugin.store.init();
             this.plugin.refreshViews();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t("settingPreserveOriginalFileName"))
+      .setDesc(t("settingPreserveOriginalFileNameDesc"))
+      .addToggle((tg) =>
+        tg
+          .setValue(this.plugin.settings.preserveOriginalFileName)
+          .onChange(async (v) => {
+            this.plugin.settings.preserveOriginalFileName = v;
+            await this.plugin.saveSettings();
           })
       );
 

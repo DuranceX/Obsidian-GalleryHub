@@ -29,6 +29,8 @@ export interface GalleryHubSettings {
   showTags: boolean;
   /** 物理删除时跳过二次确认 */
   skipDeleteConfirm: boolean;
+  /** 导入外部视觉资产时，以原始文件名保存；重名时自动编号 */
+  preserveOriginalFileName: boolean;
 }
 
 export const DEFAULT_SETTINGS: GalleryHubSettings = {
@@ -42,6 +44,7 @@ export const DEFAULT_SETTINGS: GalleryHubSettings = {
   showRatings: true,
   showTags: true,
   skipDeleteConfirm: false,
+  preserveOriginalFileName: false,
 };
 
 export interface GenMeta {
@@ -73,8 +76,10 @@ export interface GalleryItem {
   path?: string;
   /** link:目标地址,可为 http(s) 网址 / 仓库相对路径 / 系统绝对路径 */
   url?: string;
-  /** link 专用:逻辑归属文件夹(assets 相对路径形式,"" / undefined = 根)。
-   *  link 卡片无物理文件,归属与文件位置解耦,仅用于画廊内文件夹分类。 */
+  /** link 可选封面图（http/https 图片 URL） */
+  coverUrl?: string;
+  /** link/note 等无物理文件卡片的逻辑归属文件夹
+   * (assets 相对路径形式,"" / undefined = 根)。 */
   folder?: string;
   /** 导入前原始文件名 */
   fileName?: string;

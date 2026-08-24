@@ -23,6 +23,7 @@ export class CanvasBoard {
   private boardId: string;
   private getTheme: () => string;
   private importer: Importer;
+  private onDeleteFiles: (items: GalleryItem[]) => void;
   private thumbs: ThumbCache | null;
 
   private hostEl: HTMLElement;
@@ -48,6 +49,7 @@ export class CanvasBoard {
     hostEl: HTMLElement,
     getTheme: () => string,
     importer: Importer,
+    onDeleteFiles: (items: GalleryItem[]) => void,
     thumbs?: ThumbCache
   ) {
     this.app = app;
@@ -56,6 +58,7 @@ export class CanvasBoard {
     this.hostEl = hostEl;
     this.getTheme = getTheme;
     this.importer = importer;
+    this.onDeleteFiles = onDeleteFiles;
     this.thumbs = thumbs ?? null;
     this.build();
   }
@@ -135,7 +138,10 @@ export class CanvasBoard {
       }
       if (e.key === "Escape") this.clearSelection();
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (this.selectionSize()) this.deleteSelection();
+        if (this.selectionSize()) {
+          e.preventDefault();
+          this.deleteSelection();
+        }
       }
     };
     const keyup = (e: KeyboardEvent) => {
@@ -161,6 +167,9 @@ export class CanvasBoard {
       const onNode = (e.target as HTMLElement).closest(
         ".ghub-cnode, .ghub-cel, .ghub-cbar"
       );
+      // 空白画布上的任意点击都结束文字编辑。后续框选会 preventDefault，
+      // 因此不能只依赖浏览器自动转移焦点来触发 blur。
+      if (!onNode) this.finishEditing();
       // 平移:中键任意处 / 空格+左键
       if (e.button === 1 || (e.button === 0 && spaceHeld)) {
         panning = true;
@@ -416,6 +425,14 @@ export class CanvasBoard {
     );
   }
 
+  /** 结束画布中当前的内联文字编辑并触发其 blur 保存逻辑。 */
+  private finishEditing(): void {
+    const editors = this.hostEl.querySelectorAll<HTMLElement>(
+      '.ghub-cel.is-editing [contenteditable="true"]'
+    );
+    editors.forEach((editor) => editor.blur());
+  }
+
   // ================= 框选 =================
 
   private clearSelection(): void {
@@ -601,6 +618,8 @@ export class CanvasBoard {
           node.addClass("is-selected");
         } else {
           this.clearSelection();
+          this.selectedElIds.add(el.id);
+          node.addClass("is-selected");
         }
       }
       dragging = true;
@@ -854,12 +873,16 @@ export class CanvasBoard {
     const pos = it.layouts[this.boardId];
     if (!pos) return;
     const node = this.worldEl.createDiv({ cls: "ghub-cnode" });
-    if (it.type === "audio" || it.type === "link" || it.type === "note")
-      node.addClass("ghub-cnode-flat");
+    const coveredLink = it.type === "link" && !!it.coverUrl;
+    const flat =
+      it.type === "audio" ||
+      it.type === "note" ||
+      (it.type === "link" && !coveredLink);
+    if (flat) node.addClass("ghub-cnode-flat");
     this.cardEls.set(it.id, node);
     if (this.selectedIds.has(it.id)) node.addClass("is-selected");
-    const freeform = it.type === "audio" || it.type === "link" || it.type === "note";
-    const ratio = it.w && it.h ? it.h / it.w : 0.75;
+    const freeform = flat;
+    const ratio = coveredLink ? 9 / 16 : it.w && it.h ? it.h / it.w : 0.75;
     const width = pos.w || DEFAULT_CARD_W;
     const height =
       pos.h ?? (freeform ? (it.type === "audio" ? 96 : it.type === "note" ? 140 : 56) : width * ratio);
@@ -910,6 +933,31 @@ export class CanvasBoard {
       box.createDiv({ text: it.title || "", cls: "ghub-cnode-link-t" });
       if (it.note)
         box.createDiv({ text: it.note, cls: "ghub-cnode-note-body" });
+    } else if (it.type === "link" && it.coverUrl) {
+      const cover = node.createDiv({ cls: "ghub-cnode-link-cover" });
+      const renderFallback = (): void => {
+        cover.empty();
+        cover.addClass("is-fallback");
+        const ic = cover.createDiv({ cls: "ghub-linkbox-icon" });
+        setIcon(ic, targetIcon(it.url ?? ""));
+        cover.createDiv({
+          text: it.title || it.url || "",
+          cls: "ghub-cnode-link-t",
+        });
+      };
+      const img = cover.createEl("img", {
+        attr: {
+          alt: it.title || "",
+          draggable: "false",
+          referrerpolicy: "no-referrer",
+        },
+      });
+      img.addEventListener("error", renderFallback, { once: true });
+      img.src = it.coverUrl;
+      const badge = cover.createDiv({ cls: "ghub-link-cover-badge" });
+      const badgeIcon = badge.createSpan();
+      setIcon(badgeIcon, "link");
+      badge.createSpan({ text: t("link") });
     } else if (it.type === "link") {
       const box = node.createDiv({ cls: "ghub-cnode-link" });
       const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
@@ -942,6 +990,8 @@ export class CanvasBoard {
           node.addClass("is-selected");
         } else {
           this.clearSelection();
+          this.selectedIds.add(it.id);
+          node.addClass("is-selected");
         }
       }
       dragging = true;
@@ -1090,7 +1140,7 @@ export class CanvasBoard {
 
     // ---- 双击详情 ----
     node.addEventListener("dblclick", () => {
-      new DetailModal(this.app, this.store, it, this.getTheme()).open();
+      new DetailModal(this.app, this.store, this.importer, it, this.getTheme()).open();
     });
 
     // ---- 右键菜单(在选中集内右键 = 作用于整个选中集) ----
@@ -1141,7 +1191,7 @@ export class CanvasBoard {
       }
       menu.addItem((mi) =>
         mi.setTitle(t("openDetail")).setIcon("info").onClick(() => {
-          new DetailModal(this.app, this.store, it, this.getTheme()).open();
+          new DetailModal(this.app, this.store, this.importer, it, this.getTheme()).open();
         })
       );
       menu.addSeparator();
@@ -1150,6 +1200,13 @@ export class CanvasBoard {
           this.store.setLayout(it.id, this.boardId, null);
         })
       );
+      if (it.path) {
+        menu.addItem((mi) =>
+          mi.setTitle(t("deleteFilesN", { label: "" })).setIcon("trash-2").onClick(() => {
+            this.onDeleteFiles([it]);
+          })
+        );
+      }
       menu.showAtMouseEvent(e);
     });
   }
@@ -1230,7 +1287,10 @@ export class CanvasBoard {
     );
     items.forEach((it, i) => {
       if (it.layouts[this.boardId]) return; // 已在画布上
-      const flat = it.type === "audio" || it.type === "link" || it.type === "note";
+      const flat =
+        it.type === "audio" ||
+        it.type === "note" ||
+        (it.type === "link" && !it.coverUrl);
       const pos: LayoutPos = {
         x: center.x - DEFAULT_CARD_W / 2 + (i % 4) * 40,
         y: center.y - 120 + Math.floor(i / 4) * 40 + i * 12,

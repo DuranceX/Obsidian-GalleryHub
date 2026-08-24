@@ -9,6 +9,15 @@ import {
 import { t } from "./i18n";
 import { ThumbCache } from "./thumbs";
 
+function isHttpUrl(value: string): boolean {
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 /** 从二进制数据读取图片像素尺寸(失败返回 null,不阻塞导入) */
 async function probeImageSize(
   buf: ArrayBuffer
@@ -32,7 +41,11 @@ export type ImportProgressFn = (
 
 /** 导入外部文件(File 对象,来自 <input type=file> 或拖拽)到 assets/ 并入库 */
 export class Importer {
-  constructor(private app: App, private store: GalleryStore) {}
+  constructor(
+    private app: App,
+    private store: GalleryStore,
+    private preserveOriginalFileName: () => boolean = () => false
+  ) {}
 
   /** 缩略图缓存(main 注入;删除条目时清理缓存) */
   thumbs: ThumbCache | null = null;
@@ -108,7 +121,10 @@ export class Importer {
     const dir = normalizePath(folder ? `${ASSETS_DIR}/${folder}` : ASSETS_DIR);
     const ad = this.app.vault.adapter;
     if (!(await ad.exists(dir))) await ad.mkdir(dir);
-    const dest = normalizePath(`${dir}/${id}.${ext.toLowerCase()}`);
+    const storedName = this.preserveOriginalFileName()
+      ? file.name
+      : `${id}.${ext.toLowerCase()}`;
+    const dest = await this.uniqueFilePath(dir, storedName);
     const buf = await file.arrayBuffer();
     await ad.writeBinary(dest, buf);
     const size = type === "image" ? await probeImageSize(buf) : null;
@@ -132,6 +148,65 @@ export class Importer {
       gen: emptyGen(),
       layouts: {},
     };
+  }
+
+  /** 在目录中生成不覆盖已有文件的路径：name.ext → name (2).ext → name (3).ext。 */
+  private async uniqueFilePath(dir: string, fileName: string): Promise<string> {
+    const ad = this.app.vault.adapter;
+    const dot = fileName.lastIndexOf(".");
+    const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
+    const suffix = dot > 0 ? fileName.slice(dot) : "";
+    let candidate = normalizePath(`${dir}/${fileName}`);
+    let index = 2;
+    while (await ad.exists(candidate)) {
+      candidate = normalizePath(`${dir}/${stem} (${index++})${suffix}`);
+    }
+    return candidate;
+  }
+
+  /** 重命名条目的实体文件；只接受不含扩展名的主文件名，扩展名保持不变。 */
+  async renameItemFile(itemId: string, requestedBaseName: string): Promise<string | null> {
+    const item = this.store.getItem(itemId);
+    if (!item?.path) return null;
+    const file = this.app.vault.getAbstractFileByPath(item.path);
+    if (!(file instanceof TFile)) {
+      new Notice(t("fileNotFound", { path: item.path }), 5000);
+      return null;
+    }
+
+    const baseName = requestedBaseName.trim();
+    if (
+      !baseName ||
+      baseName === "." ||
+      baseName === ".." ||
+      /[\\/:*?"<>|\u0000-\u001f]/.test(baseName) ||
+      /[. ]$/.test(baseName)
+    ) {
+      new Notice(t("invalidFileName"));
+      return null;
+    }
+    if (baseName === file.basename) return baseName;
+
+    const extension = file.extension ? `.${file.extension}` : "";
+    const fileName = `${baseName}${extension}`;
+    const parent = file.parent?.path ?? "";
+    const destination = normalizePath(parent ? `${parent}/${fileName}` : fileName);
+    if (this.app.vault.getAbstractFileByPath(destination)) {
+      new Notice(t("fileNameExists", { name: fileName }));
+      return null;
+    }
+
+    try {
+      await this.app.fileManager.renameFile(file, destination);
+      this.store.updateItem(item.id, { path: destination });
+      return baseName;
+    } catch (e) {
+      new Notice(
+        t("renameFileFailed", { name: file.name, msg: (e as Error).message }),
+        6000
+      );
+      return null;
+    }
   }
 
   /** 登记仓库内已有文件(不复制,原地登记) */
@@ -182,10 +257,19 @@ export class Importer {
   }
 
   /** 新建链接卡片。target 可为 http(s) 网址 / 仓库相对路径 / 系统绝对路径 */
-  addLink(target: string, title: string): boolean {
+  addLink(
+    target: string,
+    title: string,
+    options: { coverUrl?: string; folder?: string } = {}
+  ): boolean {
     const url = target.trim();
     if (!url) {
       new Notice(t("enterUrlOrPath"));
+      return false;
+    }
+    const coverUrl = options.coverUrl?.trim() ?? "";
+    if (coverUrl && !isHttpUrl(coverUrl)) {
+      new Notice(t("invalidCoverUrl"));
       return false;
     }
     const now = new Date().toISOString();
@@ -199,6 +283,8 @@ export class Importer {
       createdAt: now,
       modifiedAt: now,
       url,
+      coverUrl: coverUrl || undefined,
+      folder: options.folder || undefined,
       title: title || autoTitle,
       note: "",
       tags: [],
@@ -211,7 +297,7 @@ export class Importer {
   }
 
   /** 新建笔记条目(正文存 note 字段,无文件),返回新条目 id */
-  addNote(): string {
+  addNote(folder?: string): string {
     const now = new Date().toISOString();
     const id = newId();
     this.store.addItem({
@@ -219,6 +305,7 @@ export class Importer {
       type: "note",
       createdAt: now,
       modifiedAt: now,
+      folder: folder || undefined,
       title: "",
       note: "",
       tags: [],
@@ -398,7 +485,7 @@ export class Importer {
 
   /** 条目所属文件夹:assets 相对路径("角色/机甲"),根下直存文件与库外/链接 → null */
   folderOf(item: GalleryItem): string | null {
-    // link 卡片无物理文件,用逻辑归属字段
+    // link/note 等卡片无物理文件,用逻辑归属字段
     if (!item.path) return item.folder?.trim() ? item.folder.trim() : null;
     const prefix = `${ASSETS_DIR}/`;
     if (!item.path.startsWith(prefix)) return null;

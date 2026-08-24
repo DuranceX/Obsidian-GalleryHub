@@ -46,6 +46,17 @@ function sortOptions(): Array<[SortMode, string]> {
   ];
 }
 
+function linkSubtitle(target: string): string {
+  if (/^https?:\/\//i.test(target)) {
+    try {
+      return new URL(target).hostname;
+    } catch {
+      // 失败时与本地/仓库路径一样显示尾部
+    }
+  }
+  return target.split(/[\\/]/).slice(-2).join("/");
+}
+
 export class GalleryView extends ItemView {
   private store: GalleryStore;
   private importer: Importer;
@@ -417,8 +428,11 @@ export class GalleryView extends ItemView {
       attr: { "aria-label": t("addLinkAria") },
     });
     linkBtn.addEventListener("click", () => {
-      new AddLinkModal(this.app, this.getTheme(), (url, title) => {
-        if (this.importer.addLink(url, title)) new Notice(t("linkAdded"));
+      const folder = this.filter.folder ?? undefined;
+      new AddLinkModal(this.app, this.getTheme(), (url, title, coverUrl) => {
+        const added = this.importer.addLink(url, title, { coverUrl, folder });
+        if (added) new Notice(t("linkAdded"));
+        return added;
       }).open();
     });
 
@@ -427,7 +441,7 @@ export class GalleryView extends ItemView {
       attr: { "aria-label": t("addNoteAria") },
     });
     noteBtn.addEventListener("click", () => {
-      const id = this.importer.addNote();
+      const id = this.importer.addNote(this.filter.folder ?? undefined);
       const it = this.store.getItem(id);
       if (it) this.openDetail(it); // 直接进详情编辑正文
     });
@@ -521,6 +535,7 @@ export class GalleryView extends ItemView {
       this.canvasHostEl,
       () => this.getTheme(),
       this.importer,
+      (items) => this.deleteWithConfirm(items),
       this.thumbs
     );
     this.refreshBoardSelect();
@@ -584,7 +599,12 @@ export class GalleryView extends ItemView {
   private pickVaultFile(): void {
     const files = this.app.vault.getFiles();
     new VaultFilePickModal(this.app, this.getTheme(), files, (f) => {
-      if (this.importer.addLink(f.path, f.basename)) new Notice(t("linkAdded"));
+      if (
+        this.importer.addLink(f.path, f.basename, {
+          folder: this.filter.folder ?? undefined,
+        })
+      )
+        new Notice(t("linkAdded"));
       this.renderGrid();
     }).open();
   }
@@ -1308,7 +1328,9 @@ export class GalleryView extends ItemView {
           : it.type === "audio"
             ? 0.52
             : it.type === "link"
-              ? 0.32
+              ? it.coverUrl
+                ? 0.62
+                : 0.32
               : it.type === "note"
                 ? Math.min(0.9, 0.28 + (it.note ? Math.min(it.note.length / 400, 0.5) : 0))
                 : 0.75;
@@ -1417,20 +1439,7 @@ export class GalleryView extends ItemView {
       audio.addEventListener("click", (e) => e.stopPropagation());
       audio.addEventListener("pointerdown", (e) => e.stopPropagation());
     } else if (it.type === "link") {
-      const box = thumb.createDiv({ cls: "ghub-linkbox" });
-      const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
-      setIcon(ic, targetIcon(it.url ?? ""));
-      const tw = box.createDiv({ cls: "ghub-audiobox-titles" });
-      tw.createDiv({ cls: "ghub-audiobox-title", text: it.title || t("noTitle") });
-      // 副标题:网址显示域名,文件路径显示所在目录/文件名
-      let sub = "";
-      const url = it.url ?? "";
-      try {
-        sub = new URL(url).hostname;
-      } catch {
-        sub = url.split(/[\\/]/).slice(-2).join("/");
-      }
-      if (sub) tw.createDiv({ cls: "ghub-linkbox-domain", text: sub });
+      this.renderLinkThumb(thumb, it);
     } else if (it.type === "note") {
       const box = thumb.createDiv({ cls: "ghub-notebox" });
       const head = box.createDiv({ cls: "ghub-audiobox-head" });
@@ -1505,6 +1514,7 @@ export class GalleryView extends ItemView {
         : [it];
       const many = targets.length > 1;
       const label = many ? t("nItems", { n: targets.length }) : "";
+      const hasPhysicalFiles = targets.some((target) => !!target.path);
       const menu = new Menu();
       if (!many) {
         // 打开:等效详情面板的打开按钮(link 智能分发 / 库内文件用 Obsidian 打开)
@@ -1549,21 +1559,82 @@ export class GalleryView extends ItemView {
           void this.importer.deleteItems(targets, false).then(() => this.clearSelection());
         })
       );
-      menu.addItem((mi) =>
-        mi.setTitle(t("deleteFilesN", { label: label ? ` (${label})` : "" })).setIcon("trash-2").onClick(() => {
-          this.deleteWithConfirm(targets);
-        })
-      );
+      if (hasPhysicalFiles) {
+        menu.addItem((mi) =>
+          mi.setTitle(t("deleteFilesN", { label: label ? ` (${label})` : "" })).setIcon("trash-2").onClick(() => {
+            this.deleteWithConfirm(targets);
+          })
+        );
+      }
       menu.showAtMouseEvent(e);
     });
 
     return card;
   }
 
+  /** 链接卡片：有封面时显示图片与链接标识，加载失败回退原有信息卡。 */
+  private renderLinkThumb(thumb: HTMLElement, it: GalleryItem): void {
+    const renderFallback = (): void => {
+      thumb.empty();
+      thumb.removeClass("ghub-link-cover");
+      const box = thumb.createDiv({ cls: "ghub-linkbox" });
+      const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
+      setIcon(ic, targetIcon(it.url ?? ""));
+      const titles = box.createDiv({ cls: "ghub-audiobox-titles" });
+      titles.createDiv({
+        cls: "ghub-audiobox-title",
+        text: it.title || t("noTitle"),
+      });
+      const subtitle = linkSubtitle(it.url ?? "");
+      if (subtitle)
+        titles.createDiv({ cls: "ghub-linkbox-domain", text: subtitle });
+    };
+
+    if (!it.coverUrl) {
+      renderFallback();
+      return;
+    }
+
+    thumb.addClass("ghub-link-cover");
+    const img = thumb.createEl("img", {
+      attr: {
+        loading: "lazy",
+        alt: it.title || t("link"),
+        referrerpolicy: "no-referrer",
+      },
+    });
+    img.addEventListener(
+      "error",
+      () => {
+        this.observer?.unobserve(img);
+        renderFallback();
+      },
+      { once: true }
+    );
+    img.dataset.src = it.coverUrl;
+    if (this.observer) this.observer.observe(img);
+    else img.src = it.coverUrl;
+
+    const badge = thumb.createDiv({ cls: "ghub-link-cover-badge" });
+    const badgeIcon = badge.createSpan();
+    setIcon(badgeIcon, "link");
+    badge.createSpan({ text: t("link") });
+
+    const meta = thumb.createDiv({ cls: "ghub-link-cover-meta" });
+    meta.createDiv({
+      cls: "ghub-link-cover-title",
+      text: it.title || t("noTitle"),
+    });
+    const subtitle = linkSubtitle(it.url ?? "");
+    if (subtitle)
+      meta.createDiv({ cls: "ghub-link-cover-domain", text: subtitle });
+  }
+
   private openDetail(it: GalleryItem): void {
     new DetailModal(
       this.app,
       this.store,
+      this.importer,
       it,
       this.getTheme(),
       undefined,
