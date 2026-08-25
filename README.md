@@ -4,7 +4,7 @@
 
 > An art asset gallery plugin for Obsidian — manage images, videos, audio and links together with AI generation prompts. Waterfall gallery + infinite canvas for curation, with 100% of your data staying in your local vault.
 
-![version](https://img.shields.io/badge/version-0.12.7-e8b04b) ![obsidian](https://img.shields.io/badge/Obsidian-%E2%89%A51.8.7-8b6cef) ![license](https://img.shields.io/badge/license-MIT-green)
+![version](https://img.shields.io/badge/version-0.12.8-e8b04b) ![obsidian](https://img.shields.io/badge/Obsidian-%E2%89%A51.8.7-8b6cef) ![license](https://img.shields.io/badge/license-MIT-green)
 
 ## Preview
 
