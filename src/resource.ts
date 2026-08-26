@@ -5,21 +5,42 @@ import { GalleryItem } from "./types";
 /** 链接目标的三种来源 */
 export type TargetKind = "url" | "vault" | "system";
 
-type ElectronShell = typeof import("electron").shell;
+interface ElectronShell {
+  showItemInFolder(path: string): void;
+}
 
-/** Electron 仅在桌面端按需加载，避免移动端启动时解析桌面模块。 */
-async function loadElectronShell(): Promise<ElectronShell | null> {
+type NodeRequire = (mod: string) => unknown;
+
+/**
+ * 取桌面端 Node 模块。必须用 window.require:Obsidian 桌面渲染进程开了 Node 集成,
+ * 而 await import("electron") 会走浏览器模块加载器,把 "electron" 当裸标识符 URL
+ * 解析,必然抛错 —— 移动端仍靠 Platform.isDesktopApp 提前退出。
+ */
+function requireDesktop<T>(mod: string): T | null {
   if (!Platform.isDesktopApp) return null;
+  const req = (window as unknown as { require?: NodeRequire }).require;
+  if (typeof req !== "function") return null;
   try {
-    return (await import("electron")).shell;
+    return (req(mod) as T) ?? null;
   } catch {
     return null;
   }
 }
 
-async function revealSystemPath(path: string, errorMessage: string): Promise<void> {
-  const shell = await loadElectronShell();
-  if (!shell) {
+/** 路径是否真实存在(桌面端);拿不到 fs 时不阻断,交给 shell 自行处理。 */
+function systemPathExists(path: string): boolean {
+  const fs = requireDesktop<{ existsSync(p: string): boolean }>("fs");
+  if (!fs) return true;
+  try {
+    return fs.existsSync(path);
+  } catch {
+    return false;
+  }
+}
+
+function revealSystemPath(path: string, errorMessage: string): void {
+  const shell = requireDesktop<{ shell?: ElectronShell }>("electron")?.shell;
+  if (!shell || !systemPathExists(path)) {
     new Notice(errorMessage, 5000);
     return;
   }
@@ -79,7 +100,7 @@ export async function openResource(app: App, target: string): Promise<void> {
   }
 
   // system:在 Windows Explorer / macOS Finder 中定位文件。
-  await revealSystemPath(s, t("fileNotFound", { path: s }));
+  revealSystemPath(s, t("fileNotFound", { path: s }));
 }
 
 /**
@@ -114,7 +135,7 @@ export function revealOrigin(app: App, it: GalleryItem): void {
       window.open(origin);
       return;
     }
-    void revealSystemPath(origin, t("cannotOpenPath"));
+    revealSystemPath(origin, t("cannotOpenPath"));
     return;
   }
   if (it.path) {
@@ -124,7 +145,7 @@ export function revealOrigin(app: App, it: GalleryItem): void {
       return;
     }
     const full = adapter.getFullPath(it.path);
-    void revealSystemPath(full, t("cannotOpenLocation"));
+    revealSystemPath(full, t("cannotOpenLocation"));
   }
 }
 
