@@ -1,7 +1,7 @@
 {
   "id": "gallery-hub",
   "name": "GalleryHub",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "minAppVersion": "1.8.7",
   "description": "Art asset gallery: manage images, videos, audio and links with AI generation prompts, waterfall gallery, filtering, and an infinite canvas for curation.",
   "author": "DuranceX",
