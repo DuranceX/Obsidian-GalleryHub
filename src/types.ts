@@ -67,6 +67,17 @@ export interface LayoutPos {
   z: number;
 }
 
+export type SystemFilePlatform = "windows" | "macos" | "linux";
+
+export interface SystemFileId {
+  volumeId: string;
+  fileId: string;
+}
+
+export type SystemFileIds = Partial<
+  Record<SystemFilePlatform, SystemFileId>
+>;
+
 export interface GalleryItem {
   id: string;
   type: ItemType;
@@ -83,6 +94,8 @@ export interface GalleryItem {
   folder?: string;
   /** 导入前原始文件名 */
   fileName?: string;
+  /** 各桌面平台最近一次观察到的本地文件身份。 */
+  systemFileIds?: SystemFileIds;
   hash?: string | null;
   /** 原始像素尺寸(导入时捕获,用于瀑布流预留空间防 CLS) */
   w?: number;
@@ -147,11 +160,14 @@ export type ColorNameKey =
 
 export interface GalleryData {
   version: number;
+  /** assets 媒体哈希索引的迁移版本；缺失表示尚未补全存量哈希。 */
+  assetHashIndexVersion?: number;
   boards: Record<string, BoardMeta>;
   items: GalleryItem[];
 }
 
 export const SCHEMA_VERSION = 1;
+export const ASSET_HASH_INDEX_VERSION = 1;
 
 export function emptyGen(): GenMeta {
   return {
@@ -172,6 +188,7 @@ import { t } from "./i18n";
 export function emptyData(): GalleryData {
   return {
     version: SCHEMA_VERSION,
+    assetHashIndexVersion: ASSET_HASH_INDEX_VERSION,
     boards: {
       "b-default": { name: t("defaultBoard"), createdAt: new Date().toISOString() },
     },

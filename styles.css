@@ -1006,6 +1006,24 @@
   text-align: center;
 }
 
+.ghub-broken-reference-title {
+  color: var(--ghub-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ghub-broken-reference-path {
+  max-width: 60ch;
+  color: var(--ghub-faint);
+  font-size: 11px;
+  text-align: center;
+  word-break: break-all;
+}
+
+.ghub-stage .ghub-broken-reference .ghub-actions {
+  width: min(320px, 80%);
+}
+
 /* ---- 右:信息栏 ---- */
 .ghub-panelbar {
   width: 320px;
@@ -1429,6 +1447,142 @@
 
 .ghub-actions button.ghub-danger:hover {
   background: var(--ghub-danger-bg) !important;
+}
+
+.ghub-index-report {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.ghub-index-report-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--ghub-border);
+  color: var(--ghub-muted);
+}
+
+.ghub-index-report-row strong {
+  color: var(--ghub-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.ghub-index-report-note {
+  margin-top: 14px;
+  color: var(--ghub-faint);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.modal.ghub-detail-modal.ghub-index-modal {
+  width: min(92vw, 900px);
+  height: min(88vh, 820px);
+}
+
+.modal.ghub-index-modal .modal-content {
+  display: block;
+  height: 100%;
+  padding: 28px 32px 24px;
+  overflow-y: auto;
+}
+
+.ghub-index-modal h2 {
+  margin: 0 0 4px;
+}
+
+.ghub-index-section-title {
+  margin: 24px 0 4px;
+  color: var(--ghub-text);
+  font-size: 14px;
+}
+
+.ghub-index-section-desc {
+  margin-bottom: 10px;
+  color: var(--ghub-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.ghub-index-pairs,
+.ghub-index-candidates {
+  display: grid;
+  gap: 7px;
+}
+
+.ghub-index-pair-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(220px, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--ghub-border);
+  border-radius: 7px;
+  background: var(--ghub-panel);
+}
+
+.ghub-index-pair-arrow {
+  color: var(--ghub-faint);
+  text-align: center;
+}
+
+.ghub-index-pair-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.ghub-index-path {
+  overflow: hidden;
+  color: var(--ghub-muted);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ghub-index-candidate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--ghub-border);
+  border-radius: 7px;
+  background: var(--ghub-panel);
+}
+
+.ghub-index-candidate-row.is-paired {
+  border-color: color-mix(in srgb, var(--ghub-accent) 55%, var(--ghub-border));
+}
+
+.ghub-index-candidate-status {
+  flex: 0 0 auto;
+  color: var(--ghub-faint);
+  font-size: 10px;
+}
+
+.ghub-index-candidate-row.is-paired .ghub-index-candidate-status {
+  color: var(--ghub-accent);
+}
+
+.ghub-index-modal > .modal-content > .ghub-actions {
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+@media (max-width: 640px) {
+  .modal.ghub-index-modal .modal-content {
+    padding: 24px 16px 18px;
+  }
+
+  .ghub-index-pair-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ghub-index-pair-arrow {
+    display: none;
+  }
 }
 
 /* 详情序列切换按钮(舞台左右边缘悬浮) */

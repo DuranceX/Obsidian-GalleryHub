@@ -193,6 +193,11 @@ export class DetailModal extends Modal {
     this.teardownPreview();
     contentEl.empty();
     const it = this.item;
+    const brokenVaultLink =
+      it.type === "link" &&
+      !!it.url &&
+      classifyTarget(it.url) === "vault" &&
+      !(this.app.vault.getAbstractFileByPath(it.url) instanceof TFile);
 
     // 序列切换按钮(窗口左右边缘悬浮)
     if (this.sequence && this.sequence.length > 1) {
@@ -317,6 +322,34 @@ export class DetailModal extends Modal {
           autoplay: "true",
         },
       });
+    } else if (brokenVaultLink && it.url) {
+      const box = stage.createDiv({ cls: "ghub-stage-link ghub-broken-reference" });
+      const ic = box.createDiv({ cls: "ghub-linkbox-icon" });
+      setIcon(ic, "file-warning");
+      box.createDiv({ cls: "ghub-broken-reference-title", text: t("brokenReferenceTitle") });
+      box.createDiv({ cls: "ghub-broken-reference-path", text: it.url });
+      const actions = box.createDiv({ cls: "ghub-actions" });
+      const relink = actions.createEl("button", {
+        text: t("reselectFile"),
+        cls: "mod-cta",
+      });
+      relink.addEventListener("click", () => {
+        new VaultFilePickModal(
+          this.app,
+          this.themeClass,
+          this.app.vault.getFiles(),
+          (file) => {
+            this.store.updateItem(it.id, { url: file.path });
+            this.renderCurrent();
+          }
+        ).open();
+      });
+      const remove = actions.createEl("button", { text: t("removeFromLibrary") });
+      remove.addEventListener("click", () => {
+        this.store.deleteItem(it.id);
+        this.close();
+        this.onDeleted?.();
+      });
     } else if (it.type === "link" && it.url && previewKind(it.url)) {
       // 仓库内文本类文件(md/txt/json/yaml):舞台做只读预览
       this.renderTextPreview(stage, it.url, previewKind(it.url)!);
@@ -380,9 +413,9 @@ export class DetailModal extends Modal {
         }
       });
     }
-    if (it.type === "link" && it.url) {
+    if (it.type === "link" && it.url && !brokenVaultLink) {
       const kind = classifyTarget(it.url);
-      // vault 内文件由 Obsidian 打开;系统文件交给默认程序;网址开浏览器
+      // vault 内文件由 Obsidian 打开;系统路径在文件管理器中显示;网址开浏览器
       const label =
         kind === "url"
           ? t("openInBrowser")

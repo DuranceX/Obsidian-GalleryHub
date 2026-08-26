@@ -8,6 +8,11 @@ import {
 } from "./types";
 import { t } from "./i18n";
 import { ThumbCache } from "./thumbs";
+import { hashAssetBuffer } from "./asset-index";
+import {
+  readSystemFileObservation,
+  withSystemFileObservation,
+} from "./system-file-id";
 
 function isHttpUrl(value: string): boolean {
   try {
@@ -41,6 +46,8 @@ export type ImportProgressFn = (
 
 /** 导入外部文件(File 对象,来自 <input type=file> 或拖拽)到 assets/ 并入库 */
 export class Importer {
+  private pendingAssetHashes = new Map<string, Promise<string | null>>();
+
   constructor(
     private app: App,
     private store: GalleryStore,
@@ -78,6 +85,7 @@ export class Importer {
     }
     // 整批一次性入库:单次刷新、单次保存
     this.store.addItems(batch);
+    this.commitPendingAssetHashes(batch.map((item) => item.id));
     if (batch.length) new Notice(t("importedN", { n: batch.length }));
     return batch.length;
   }
@@ -127,7 +135,11 @@ export class Importer {
     const dest = await this.uniqueFilePath(dir, storedName);
     const buf = await file.arrayBuffer();
     await ad.writeBinary(dest, buf);
-    const size = type === "image" ? await probeImageSize(buf) : null;
+    this.queueAssetHash(id, buf);
+    const [size, systemFileObservation] = await Promise.all([
+      type === "image" ? probeImageSize(buf) : Promise.resolve(null),
+      readSystemFileObservation(this.app, dest),
+    ]);
 
     const now = new Date().toISOString();
     return {
@@ -137,6 +149,9 @@ export class Importer {
       modifiedAt: now,
       path: dest,
       fileName: file.name,
+      systemFileIds: systemFileObservation
+        ? withSystemFileObservation(undefined, systemFileObservation)
+        : undefined,
       hash: null,
       w: size?.w,
       h: size?.h,
@@ -148,6 +163,35 @@ export class Importer {
       gen: emptyGen(),
       layouts: {},
     };
+  }
+
+  /** 导入不等待摘要计算；条目入库后再以单次静默更新写回指纹。 */
+  private queueAssetHash(id: string, buffer: ArrayBuffer): void {
+    this.pendingAssetHashes.set(
+      id,
+      hashAssetBuffer(buffer).catch(() => null)
+    );
+  }
+
+  private commitPendingAssetHashes(ids: string[]): void {
+    const pending = ids.flatMap((id) => {
+      const promise = this.pendingAssetHashes.get(id);
+      if (!promise) return [];
+      this.pendingAssetHashes.delete(id);
+      return [{ id, promise }];
+    });
+    if (!pending.length) return;
+    void Promise.all(
+      pending.map(async ({ id, promise }) => ({ id, hash: await promise }))
+    ).then((results) => {
+      const patches = results
+        .filter((result): result is { id: string; hash: string } => !!result.hash)
+        .map(({ id, hash }) => ({ id, patch: { hash } }));
+      this.store.updateItems(patches, {
+        touchModifiedAt: false,
+        notify: false,
+      });
+    });
   }
 
   /** 在目录中生成不覆盖已有文件的路径：name.ext → name (2).ext → name (3).ext。 */
@@ -226,22 +270,31 @@ export class Importer {
     }
     const now = new Date().toISOString();
     const name = vaultPath.split("/").pop() ?? vaultPath;
+    const managed = normalizePath(vaultPath).startsWith(`${ASSETS_DIR}/`);
+    let buffer: ArrayBuffer | null = null;
     let size: { w: number; h: number } | null = null;
-    if (type === "image") {
+    if (type === "image" || managed) {
       try {
-        const buf = await this.app.vault.adapter.readBinary(vaultPath);
-        size = await probeImageSize(buf);
+        buffer = await this.app.vault.adapter.readBinary(vaultPath);
+        if (type === "image") size = await probeImageSize(buffer);
       } catch {
         /* ignore */
       }
     }
+    const id = newId();
+    const systemFileObservation = managed
+      ? await readSystemFileObservation(this.app, vaultPath)
+      : null;
     this.store.addItem({
-      id: newId(),
+      id,
       type,
       createdAt: now,
       modifiedAt: now,
       path: vaultPath,
       fileName: name,
+      systemFileIds: systemFileObservation
+        ? withSystemFileObservation(undefined, systemFileObservation)
+        : undefined,
       hash: null,
       w: size?.w,
       h: size?.h,
@@ -253,6 +306,10 @@ export class Importer {
       gen: emptyGen(),
       layouts: {},
     });
+    if (managed && buffer) {
+      this.queueAssetHash(id, buffer);
+      this.commitPendingAssetHashes([id]);
+    }
     return true;
   }
 

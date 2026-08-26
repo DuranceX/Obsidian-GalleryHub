@@ -138,6 +138,17 @@ export class GalleryStore {
     for (const fn of this.itemListeners) fn(id);
   }
 
+  private emitItems(ids: string[]): void {
+    if (!ids.length) return;
+    if (this.itemListeners.size === 0) {
+      this.emit();
+      return;
+    }
+    for (const id of ids) {
+      for (const fn of this.itemListeners) fn(id);
+    }
+  }
+
   private emit(): void {
     for (const fn of this.listeners) fn();
   }
@@ -150,6 +161,10 @@ export class GalleryStore {
 
   getItem(id: string): GalleryItem | undefined {
     return this.data.items.find((it) => it.id === id);
+  }
+
+  getAssetHashIndexVersion(): number {
+    return this.data.assetHashIndexVersion ?? 0;
   }
 
   allTags(): string[] {
@@ -309,6 +324,37 @@ export class GalleryStore {
     if (!it) return;
     Object.assign(it, patch, { modifiedAt: new Date().toISOString() });
     this.emitItem(id);
+    this.scheduleSave();
+  }
+
+  /** 批量更新条目并只保存一次；索引元数据可选择不改 modifiedAt、不刷新 UI。 */
+  updateItems(
+    patches: Array<{ id: string; patch: Partial<GalleryItem> }>,
+    options: { touchModifiedAt?: boolean; notify?: boolean } = {}
+  ): number {
+    if (!patches.length) return 0;
+    if (this.guardReadOnly()) return 0;
+    const touchModifiedAt = options.touchModifiedAt ?? true;
+    const notify = options.notify ?? true;
+    const changed: string[] = [];
+    const now = new Date().toISOString();
+    for (const { id, patch } of patches) {
+      const item = this.getItem(id);
+      if (!item) continue;
+      Object.assign(item, patch);
+      if (touchModifiedAt) item.modifiedAt = now;
+      changed.push(id);
+    }
+    if (!changed.length) return 0;
+    if (notify) this.emitItems(changed);
+    this.scheduleSave();
+    return changed.length;
+  }
+
+  setAssetHashIndexVersion(version: number): void {
+    if (this.guardReadOnly()) return;
+    if (this.data.assetHashIndexVersion === version) return;
+    this.data.assetHashIndexVersion = version;
     this.scheduleSave();
   }
 
